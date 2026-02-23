@@ -3,22 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Menú Semanal</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>DHL Menú Semanal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root {
-      --bg: #f8f9fb;
+      --bg: #faf8f5;
       --card: #ffffff;
-      --border: #e5e7eb;
-      --primary: #2563eb;
-      --primary-light: #eff6ff;
-      --text: #111827;
-      --muted: #6b7280;
+      --border: #e8e0d4;
+      --primary: #D40511;
+      --primary-light: #fff1f1;
+      --primary-hover: #b30410;
+      --yellow: #FFCC00;
+      --yellow-light: #fff9e0;
+      --text: #2d2d2d;
+      --muted: #7a7268;
       --success: #16a34a;
       --success-light: #f0fdf4;
-      --danger: #dc2626;
-      --accent: #7c3aed;
+      --danger: #D40511;
+      --accent: #D40511;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,29 +31,33 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse at 10% 90%, rgba(255, 204, 0, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 10%, rgba(212, 5, 17, 0.05) 0%, transparent 50%);
     }
 
     /* NAVEGACIÓN */
     nav {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
+      background: #D40511;
       padding: 0 1.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 56px;
+      height: 58px;
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: 0 2px 8px rgba(212, 5, 17, 0.2);
     }
 
     .nav-logo {
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--primary);
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: #FFCC00;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      letter-spacing: -0.02em;
     }
 
     .nav-tabs {
@@ -62,16 +69,16 @@
       padding: 0.4rem 0.9rem;
       border-radius: 6px;
       font-size: 0.82rem;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
       border: none;
       background: transparent;
-      color: var(--muted);
+      color: rgba(255,255,255,0.7);
       transition: all 0.2s;
     }
 
-    .nav-tab:hover { background: var(--bg); color: var(--text); }
-    .nav-tab.activo { background: var(--primary-light); color: var(--primary); }
+    .nav-tab:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .nav-tab.activo { background: #FFCC00; color: #2d2d2d; }
 
     /* VISTAS */
     .vista { display: none; padding: 2rem 1rem 4rem; max-width: 700px; margin: 0 auto; }
@@ -80,8 +87,9 @@
     /* TIPOGRAFÍA */
     h2 {
       font-size: 1.4rem;
-      font-weight: 700;
+      font-weight: 800;
       margin-bottom: 0.3rem;
+      color: var(--primary);
     }
 
     .desc {
@@ -98,6 +106,7 @@
       border-radius: 10px;
       padding: 1.4rem;
       margin-bottom: 1.2rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
 
     .card-title {
@@ -131,7 +140,7 @@
       margin-bottom: 0.8rem;
     }
 
-    input[type="text"]:focus { border-color: var(--primary); }
+    input[type="text"]:focus { border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.15); }
 
     .semana-input {
       display: flex;
@@ -174,7 +183,7 @@
       color: var(--danger);
     }
 
-    .btn-icon:hover { background: #fef2f2; border-color: var(--danger); }
+    .btn-icon:hover { background: var(--primary-light); border-color: var(--danger); }
 
     .btn-agregar {
       background: none;
@@ -206,7 +215,7 @@
     }
 
     .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:hover { background: var(--primary-hover); }
     .btn-success { background: var(--success); color: white; }
     .btn-success:hover { background: #15803d; }
     .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
@@ -218,8 +227,8 @@
 
     /* LINK BOX */
     .link-box {
-      background: var(--primary-light);
-      border: 1px solid #bfdbfe;
+      background: var(--yellow-light);
+      border: 1px solid #ffe580;
       border-radius: 8px;
       padding: 1rem;
       display: flex;
@@ -231,7 +240,7 @@
     .link-text {
       flex: 1;
       font-size: 0.78rem;
-      color: var(--primary);
+      color: #92400e;
       word-break: break-all;
       font-family: monospace;
     }
@@ -259,8 +268,8 @@
       flex-shrink: 0;
     }
 
-    .dia-tab:hover { border-color: var(--primary); color: var(--primary); }
-    .dia-tab.activo { background: var(--primary); color: white; border-color: var(--primary); }
+    .dia-tab:hover { border-color: var(--yellow); color: var(--text); background: var(--yellow-light); }
+    .dia-tab.activo { background: var(--yellow); color: #2d2d2d; border-color: var(--yellow); font-weight: 700; }
 
     .dia-contenido { display: none; }
     .dia-contenido.activo { display: block; }
@@ -286,7 +295,7 @@
       line-height: 1.3;
     }
 
-    .opcion-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+    .opcion-btn:hover { border-color: var(--yellow); background: var(--yellow-light); }
     .opcion-btn.seleccionado { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
     .opcion-btn.seleccionado::before { content: '✓ '; }
 
@@ -299,11 +308,11 @@
     }
 
     .form-dia-header {
-      background: var(--primary-light);
+      background: var(--yellow);
       padding: 0.8rem 1.2rem;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 0.9rem;
-      color: var(--primary);
+      color: #2d2d2d;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -337,7 +346,7 @@
 
     .stat-num {
       font-size: 2rem;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--primary);
       line-height: 1;
       margin-bottom: 0.25rem;
@@ -401,8 +410,8 @@
       width: 30px;
       height: 30px;
       border-radius: 50%;
-      background: var(--primary-light);
-      color: var(--primary);
+      background: var(--yellow);
+      color: #2d2d2d;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -430,12 +439,12 @@
       bottom: 1.5rem;
       left: 50%;
       transform: translateX(-50%) translateY(80px);
-      background: #1f2937;
-      color: white;
+      background: #2d2d2d;
+      color: var(--yellow);
       padding: 0.7rem 1.2rem;
       border-radius: 8px;
       font-size: 0.82rem;
-      font-weight: 500;
+      font-weight: 600;
       z-index: 999;
       transition: transform 0.3s ease;
       white-space: nowrap;
@@ -445,8 +454,8 @@
 
     /* ÉXITO */
     .success-box {
-      background: var(--success-light);
-      border: 1px solid #bbf7d0;
+      background: var(--yellow-light);
+      border: 1px solid #ffe580;
       border-radius: 10px;
       padding: 2rem;
       text-align: center;
@@ -454,8 +463,8 @@
     }
 
     .success-box.visible { display: block; }
-    .success-box h3 { font-size: 1.2rem; color: var(--success); margin-bottom: 0.5rem; }
-    .success-box p { font-size: 0.82rem; color: #166534; }
+    .success-box h3 { font-size: 1.2rem; color: var(--primary); margin-bottom: 0.5rem; }
+    .success-box p { font-size: 0.82rem; color: var(--text); }
 
     @media (max-width: 480px) {
       .opciones-grid { grid-template-columns: 1fr; }
@@ -468,7 +477,7 @@
 <body>
 
 <nav>
-  <div class="nav-logo">🍽️ Menú Semanal</div>
+  <div class="nav-logo">🍽️ DHL Menú</div>
   <div class="nav-tabs">
     <button class="nav-tab" id="tab-login" onclick="irA('login')" style="display:none">🔑 Login</button>
     <button class="nav-tab" id="tab-admin" onclick="irA('admin')" style="display:none">⚙️ Admin</button>
@@ -582,14 +591,10 @@
   </div>
   <p class="desc" id="resumen-semana-titulo">Cargando...</p>
 
-  <div class="resumen-grid">
+  <div style="margin-bottom:1.2rem">
     <div class="stat-card">
       <div class="stat-num" id="stat-total">—</div>
       <div class="stat-label">Respuestas recibidas</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-num" id="stat-pendientes" style="color:var(--accent)">—</div>
-      <div class="stat-label">Pendientes</div>
     </div>
   </div>
 
@@ -627,7 +632,7 @@
 // ========== CONSTANTES ==========
 var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 var GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
-var TOTAL_ESPERADO = 30;
+// Sin límite de pedidos
 
 // ========== SUPABASE CONFIG ==========
 var SUPABASE_URL = 'https://ghxgamzvvgsootxxyeee.supabase.co';
@@ -1021,7 +1026,6 @@ async function cargarResumen() {
   if (!menu) {
     document.getElementById('resumen-semana-titulo').textContent = 'No hay menú configurado';
     document.getElementById('stat-total').textContent = '—';
-    document.getElementById('stat-pendientes').textContent = '—';
     document.getElementById('resumen-sin-datos').style.display = 'block';
     document.getElementById('resumen-datos').style.display = 'none';
     return;
@@ -1030,7 +1034,6 @@ async function cargarResumen() {
   document.getElementById('resumen-semana-titulo').textContent =
     `Semana del ${menu.desde} al ${menu.hasta}`;
   document.getElementById('stat-total').textContent = resumenRespuestas.length;
-  document.getElementById('stat-pendientes').textContent = Math.max(0, TOTAL_ESPERADO - resumenRespuestas.length);
 
   if (resumenRespuestas.length === 0) {
     document.getElementById('resumen-sin-datos').style.display = 'block';
@@ -1105,13 +1108,13 @@ function renderResumenDia() {
     const contComida = {};
     personas.forEach(p => { contComida[p.comida] = (contComida[p.comida] || 0) + 1; });
     const listaComida = Object.entries(contComida).sort((a,b) => b[1]-a[1])
-      .map(([nombre, cant]) => `<span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px">${cant}x ${nombre}</span>`).join(' ');
+      .map(([nombre, cant]) => `<span style="background:var(--yellow-light); color:#92400e; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #ffe580">${cant}x ${nombre}</span>`).join(' ');
 
     // Subtotales bebida
     const contBebida = {};
     personas.forEach(p => { contBebida[p.bebida] = (contBebida[p.bebida] || 0) + 1; });
     const listaBebida = Object.entries(contBebida).sort((a,b) => b[1]-a[1])
-      .map(([nombre, cant]) => `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px">${cant}x ${nombre}</span>`).join(' ');
+      .map(([nombre, cant]) => `<span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #fca5a5">${cant}x ${nombre}</span>`).join(' ');
 
     // Lista de personas
     const listaPersonas = personas.map(r => `
@@ -1127,7 +1130,7 @@ function renderResumenDia() {
       <div class="card" style="margin-bottom:1rem">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
           <h3 style="margin:0; font-size:1rem">${grupo}</h3>
-          <span style="background:var(--primary); color:#fff; padding:2px 10px; border-radius:10px; font-size:0.75rem">${personas.length} persona${personas.length > 1 ? 's' : ''}</span>
+          <span style="background:var(--yellow); color:#2d2d2d; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:600">${personas.length} persona${personas.length > 1 ? 's' : ''}</span>
         </div>
         <div style="margin-bottom:0.5rem">
           <div style="font-size:0.7rem; color:var(--muted); margin-bottom:4px">🍛 Comidas</div>
