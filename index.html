@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Menú Semanal</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root {
       --bg: #f8f9fb;
@@ -620,22 +620,28 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ========== SUPABASE CONFIG ==========
-const SUPABASE_URL = 'https://ghxgamzvvgsootxxyeee.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoeGdhbXp2dmdzb290eHh5ZWVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MDQyMTQsImV4cCI6MjA4NzM4MDIxNH0.wem5mZntSR-BB82ivuQ3lYC4AJHxvD2s7x-zIVXJ2zQ';
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
 // ========== CONSTANTES ==========
-const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-const GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
-const TOTAL_ESPERADO = 30;
+var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+var GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
+var TOTAL_ESPERADO = 30;
+
+// ========== SUPABASE CONFIG ==========
+var SUPABASE_URL = 'https://ghxgamzvvgsootxxyeee.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoeGdhbXp2dmdzb290eHh5ZWVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MDQyMTQsImV4cCI6MjA4NzM4MDIxNH0.wem5mZntSR-BB82ivuQ3lYC4AJHxvD2s7x-zIVXJ2zQ';
+
+var db = null;
+try {
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch(e) {
+  console.error('Error al inicializar Supabase:', e);
+}
 
 // ========== SUPABASE HELPERS ==========
-let menuActivo = null;
+var menuActivo = null;
 
 async function getMenu() {
-  const { data, error } = await supabase
+  if (!db) return null;
+  const { data, error } = await db
     .from('menu')
     .select('*')
     .order('creado', { ascending: false })
@@ -647,7 +653,8 @@ async function getMenu() {
 }
 
 async function saveMenu(menu) {
-  const { data, error } = await supabase
+  if (!db) { console.error('Supabase no inicializado'); return null; }
+  const { data, error } = await db
     .from('menu')
     .insert(menu)
     .select()
@@ -658,7 +665,8 @@ async function saveMenu(menu) {
 }
 
 async function getRespuestas(menuId) {
-  const { data, error } = await supabase
+  if (!db) return [];
+  const { data, error } = await db
     .from('respuestas')
     .select('*')
     .eq('menu_id', menuId);
@@ -667,7 +675,8 @@ async function getRespuestas(menuId) {
 }
 
 async function saveRespuesta(respuesta) {
-  const { data: existing } = await supabase
+  if (!db) { console.error('Supabase no inicializado'); return false; }
+  const { data: existing } = await db
     .from('respuestas')
     .select('id')
     .ilike('nombre', respuesta.nombre)
@@ -675,17 +684,18 @@ async function saveRespuesta(respuesta) {
     .maybeSingle();
 
   if (existing) {
-    const { error } = await supabase.from('respuestas').update(respuesta).eq('id', existing.id);
+    const { error } = await db.from('respuestas').update(respuesta).eq('id', existing.id);
     if (error) { console.error('Error al actualizar respuesta:', error); return false; }
   } else {
-    const { error } = await supabase.from('respuestas').insert(respuesta);
+    const { error } = await db.from('respuestas').insert(respuesta);
     if (error) { console.error('Error al guardar respuesta:', error); return false; }
   }
   return true;
 }
 
 async function deleteRespuestas(menuId) {
-  const { error } = await supabase.from('respuestas').delete().eq('menu_id', menuId);
+  if (!db) return;
+  const { error } = await db.from('respuestas').delete().eq('menu_id', menuId);
   if (error) console.error('Error al eliminar respuestas:', error);
 }
 
@@ -708,8 +718,8 @@ function toast(msg) {
 }
 
 // ========== ADMIN ==========
-let menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: [], postre: '' }));
-let adminDiaActivo = 0;
+var menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: [], postre: '' }));
+var adminDiaActivo = 0;
 
 function renderAdminTabs() {
   const tabsEl = document.getElementById('admin-dia-tabs');
@@ -829,8 +839,8 @@ function copiarLink() {
 }
 
 // ========== FORMULARIO ==========
-let grupoSeleccionado = null;
-let pedidosPorDia = {}; // { "Lunes": { comida: "...", bebida: "..." }, ... }
+var grupoSeleccionado = null;
+var pedidosPorDia = {}; // { "Lunes": { comida: "...", bebida: "..." }, ... }
 
 async function cargarFormulario() {
   const menu = await getMenu();
@@ -959,8 +969,8 @@ async function enviarPedido() {
 }
 
 // ========== RESUMEN ==========
-let resumenDiaActivo = 0;
-let resumenRespuestas = [];
+var resumenDiaActivo = 0;
+var resumenRespuestas = [];
 
 async function cargarResumen() {
   const menu = await getMenu();
