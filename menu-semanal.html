@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menú Semanal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f8f9fb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --text: #111827;
+      --muted: #6b7280;
+      --success: #16a34a;
+      --success-light: #f0fdf4;
+      --danger: #dc2626;
+      --accent: #7c3aed;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* NAVEGACIÓN */
+    nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .nav-tab {
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover { background: var(--bg); color: var(--text); }
+    .nav-tab.activo { background: var(--primary-light); color: var(--primary); }
+
+    /* VISTAS */
+    .vista { display: none; padding: 2rem 1rem 4rem; max-width: 700px; margin: 0 auto; }
+    .vista.activa { display: block; }
+
+    /* TIPOGRAFÍA */
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.3rem;
+    }
+
+    .desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 1.8rem;
+      line-height: 1.5;
+    }
+
+    /* CARDS */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .card-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* INPUTS */
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 0.3rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.88rem;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 0.8rem;
+    }
+
+    input[type="text"]:focus { border-color: var(--primary); }
+
+    .semana-input {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      margin-bottom: 1.5rem;
+    }
+
+    .semana-input > div { flex: 1; }
+    .semana-input input { margin-bottom: 0; }
+
+    /* LISTA DE ITEMS */
+    .items-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .item-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .item-row input { margin-bottom: 0; flex: 1; }
+
+    .btn-icon {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--card);
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      color: var(--danger);
+    }
+
+    .btn-icon:hover { background: #fef2f2; border-color: var(--danger); }
+
+    .btn-agregar {
+      background: none;
+      border: 1.5px dashed var(--border);
+      border-radius: 7px;
+      padding: 0.6rem;
+      width: 100%;
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .btn-agregar:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+
+    /* BOTONES */
+    .btn {
+      padding: 0.7rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--bg); }
+
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* LINK BOX */
+    .link-box {
+      background: var(--primary-light);
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 1rem;
+    }
+
+    .link-text {
+      flex: 1;
+      font-size: 0.78rem;
+      color: var(--primary);
+      word-break: break-all;
+      font-family: monospace;
+    }
+
+    /* TABS DE DÍAS */
+    .dia-tabs {
+      display: flex;
+      gap: 0.3rem;
+      margin-bottom: 1.2rem;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+    }
+
+    .dia-tab {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: white;
+      color: var(--muted);
+      transition: all 0.2s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .dia-tab:hover { border-color: var(--primary); color: var(--primary); }
+    .dia-tab.activo { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .dia-contenido { display: none; }
+    .dia-contenido.activo { display: block; }
+
+    /* FORMULARIO EMPLEADO */
+    .opciones-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .opcion-btn {
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      background: white;
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.82rem;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      transition: all 0.2s;
+      line-height: 1.3;
+    }
+
+    .opcion-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+    .opcion-btn.seleccionado { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+    .opcion-btn.seleccionado::before { content: '✓ '; }
+
+    /* SECCIÓN DÍA EN FORMULARIO */
+    .form-dia-section {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1.2rem;
+      overflow: hidden;
+    }
+
+    .form-dia-header {
+      background: var(--primary-light);
+      padding: 0.8rem 1.2rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .form-dia-body {
+      padding: 1.2rem;
+    }
+
+    .form-dia-postre {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* RESUMEN */
+    .resumen-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .stat-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .bar-item {
+      margin-bottom: 0.9rem;
+    }
+
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .bar-count {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .bar-track {
+      height: 8px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--primary);
+      transition: width 0.5s ease;
+    }
+
+    .bar-fill.bebida { background: var(--accent); }
+
+    .personas-lista {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .persona-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0.9rem;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.82rem;
+    }
+
+    .persona-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .persona-nombre { font-weight: 600; flex: 1; }
+    .persona-detalle { color: var(--muted); font-size: 0.75rem; text-align: right; }
+
+    /* ESTADO VACÍO */
+    .empty {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1f2937;
+      color: white;
+      padding: 0.7rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      z-index: 999;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .toast.visible { transform: translateX(-50%) translateY(0); }
+
+    /* ÉXITO */
+    .success-box {
+      background: var(--success-light);
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      display: none;
+    }
+
+    .success-box.visible { display: block; }
+    .success-box h3 { font-size: 1.2rem; color: var(--success); margin-bottom: 0.5rem; }
+    .success-box p { font-size: 0.82rem; color: #166534; }
+
+    @media (max-width: 480px) {
+      .opciones-grid { grid-template-columns: 1fr; }
+      .resumen-grid { grid-template-columns: 1fr 1fr; }
+      .nav-tab { padding: 0.4rem 0.6rem; font-size: 0.75rem; }
+      .dia-tab { padding: 0.4rem 0.7rem; font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">🍽️ Menú Semanal</div>
+  <div class="nav-tabs">
+    <button class="nav-tab" id="tab-admin" onclick="irA('admin')">⚙️ Admin</button>
+    <button class="nav-tab" id="tab-form" onclick="irA('form')">📋 Formulario</button>
+    <button class="nav-tab activo" id="tab-resumen" onclick="irA('resumen')">📊 Resumen</button>
+  </div>
+</nav>
+
+<!-- ======================== VISTA ADMIN ======================== -->
+<div class="vista" id="vista-admin">
+  <h2>Configurar menú</h2>
+  <p class="desc">Configurá las opciones de comida, bebida y postre para cada día de la semana.</p>
+
+  <div class="card">
+    <div class="card-title">📅 Semana</div>
+    <div class="semana-input">
+      <div>
+        <label>Desde</label>
+        <input type="text" id="semana-desde" placeholder="Ej: 24 de febrero">
+      </div>
+      <div>
+        <label>Hasta</label>
+        <input type="text" id="semana-hasta" placeholder="Ej: 28 de febrero">
+      </div>
+    </div>
+  </div>
+
+  <div class="dia-tabs" id="admin-dia-tabs"></div>
+  <div id="admin-dia-contenidos"></div>
+
+  <button class="btn btn-primary btn-full" onclick="guardarMenu()" style="margin-top:0.5rem">
+    Guardar y generar link →
+  </button>
+
+  <div id="link-generado" style="display:none; margin-top:1rem;">
+    <div class="link-box">
+      <span class="link-text" id="link-texto"></span>
+      <button class="btn btn-outline" onclick="copiarLink()" style="flex-shrink:0">Copiar</button>
+    </div>
+    <p style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem; text-align:center">
+      Compartí este link con tu equipo. Las respuestas se guardan automáticamente.
+    </p>
+  </div>
+</div>
+
+<!-- ======================== VISTA FORMULARIO ======================== -->
+<div class="vista" id="vista-form">
+
+  <div id="form-sin-menu" class="empty" style="display:none">
+    <div class="empty-icon">⚠️</div>
+    <p>No hay un menú configurado todavía.<br>Pedile al admin que configure el menú primero.</p>
+  </div>
+
+  <div id="form-contenido" style="display:none">
+    <div style="margin-bottom:1.5rem">
+      <div style="font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.25rem">Menú de la semana</div>
+      <h2 id="form-semana-titulo">—</h2>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏢 ¿A qué equipo pertenecés?</div>
+      <div class="opciones-grid" id="opciones-grupo"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 Tu nombre</div>
+      <input type="text" id="nombre-persona" placeholder="Ingresá tu nombre y apellido">
+    </div>
+
+    <div id="form-dias-container"></div>
+
+    <div id="ya-respondio" class="success-box" style="margin-bottom:1rem">
+      <h3>✅ Ya enviaste tu pedido</h3>
+      <p id="ya-respondio-detalle"></p>
+    </div>
+
+    <button class="btn btn-success btn-full" id="btn-enviar" onclick="enviarPedido()">
+      Confirmar pedido de la semana ✓
+    </button>
+  </div>
+
+</div>
+
+<!-- ======================== VISTA RESUMEN ======================== -->
+<div class="vista activa" id="vista-resumen">
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.3rem">
+    <h2>Resumen semanal</h2>
+    <button class="btn btn-outline" onclick="cargarResumen()" style="font-size:0.78rem; padding:0.4rem 0.8rem">↻ Actualizar</button>
+  </div>
+  <p class="desc" id="resumen-semana-titulo">Cargando...</p>
+
+  <div class="resumen-grid">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-label">Respuestas recibidas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-pendientes" style="color:var(--accent)">—</div>
+      <div class="stat-label">Pendientes</div>
+    </div>
+  </div>
+
+  <div id="resumen-sin-datos" class="empty" style="display:none">
+    <div class="empty-icon">📭</div>
+    <p>Todavía no hay respuestas.<br>Compartí el formulario con tu equipo.</p>
+  </div>
+
+  <div id="resumen-datos" style="display:none">
+    <div class="dia-tabs" id="resumen-dia-tabs"></div>
+
+    <div id="resumen-postre" style="display:none; margin-bottom:1rem;">
+      <div class="card" style="display:flex; align-items:center; gap:0.75rem; padding:1rem 1.4rem; border-left:3px solid #d97706;">
+        <span style="font-size:1.4rem">🍮</span>
+        <div>
+          <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Postre del día</div>
+          <div style="font-weight:600; font-size:0.95rem;" id="resumen-postre-texto"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🍛 Comidas pedidas</div>
+      <div id="barras-comida"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🥤 Bebidas pedidas</div>
+      <div id="barras-bebida"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏢 Totales por equipo</div>
+      <div id="barras-grupo"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👥 Detalle por persona</div>
+      <div class="personas-lista" id="lista-personas"></div>
+    </div>
+
+    <button class="btn btn-outline btn-full" onclick="resetearRespuestas()" style="margin-top:0.5rem; color:var(--danger); border-color:var(--danger)">
+      🗑 Limpiar respuestas (nueva semana)
+    </button>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== SUPABASE CONFIG ==========
+const SUPABASE_URL = 'https://ghxgamzvvgsootxxyeee.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoeGdhbXp2dmdzb290eHh5ZWVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MDQyMTQsImV4cCI6MjA4NzM4MDIxNH0.wem5mZntSR-BB82ivuQ3lYC4AJHxvD2s7x-zIVXJ2zQ';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ========== CONSTANTES ==========
+const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+const GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
+const TOTAL_ESPERADO = 30;
+
+// ========== SUPABASE HELPERS ==========
+let menuActivo = null;
+
+async function getMenu() {
+  const { data, error } = await supabase
+    .from('menu')
+    .select('*')
+    .order('creado', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('Error al obtener menú:', error); return null; }
+  menuActivo = data;
+  return data;
+}
+
+async function saveMenu(menu) {
+  const { data, error } = await supabase
+    .from('menu')
+    .insert(menu)
+    .select()
+    .single();
+  if (error) { console.error('Error al guardar menú:', error); return null; }
+  menuActivo = data;
+  return data;
+}
+
+async function getRespuestas(menuId) {
+  const { data, error } = await supabase
+    .from('respuestas')
+    .select('*')
+    .eq('menu_id', menuId);
+  if (error) { console.error('Error al obtener respuestas:', error); return []; }
+  return data || [];
+}
+
+async function saveRespuesta(respuesta) {
+  const { data: existing } = await supabase
+    .from('respuestas')
+    .select('id')
+    .ilike('nombre', respuesta.nombre)
+    .eq('menu_id', respuesta.menu_id)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase.from('respuestas').update(respuesta).eq('id', existing.id);
+    if (error) { console.error('Error al actualizar respuesta:', error); return false; }
+  } else {
+    const { error } = await supabase.from('respuestas').insert(respuesta);
+    if (error) { console.error('Error al guardar respuesta:', error); return false; }
+  }
+  return true;
+}
+
+async function deleteRespuestas(menuId) {
+  const { error } = await supabase.from('respuestas').delete().eq('menu_id', menuId);
+  if (error) console.error('Error al eliminar respuestas:', error);
+}
+
+// ========== NAVEGACIÓN ==========
+function irA(vista) {
+  document.querySelectorAll('.vista').forEach(v => v.classList.remove('activa'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('activo'));
+  document.getElementById('vista-' + vista).classList.add('activa');
+  document.getElementById('tab-' + vista).classList.add('activo');
+  if (vista === 'form') cargarFormulario();
+  if (vista === 'resumen') cargarResumen();
+}
+
+// ========== TOAST ==========
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 2500);
+}
+
+// ========== ADMIN ==========
+let menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: [], postre: '' }));
+let adminDiaActivo = 0;
+
+function renderAdminTabs() {
+  const tabsEl = document.getElementById('admin-dia-tabs');
+  const contEl = document.getElementById('admin-dia-contenidos');
+  tabsEl.innerHTML = '';
+  contEl.innerHTML = '';
+
+  DIAS.forEach((dia, i) => {
+    // Tab
+    const tab = document.createElement('button');
+    tab.className = 'dia-tab' + (i === adminDiaActivo ? ' activo' : '');
+    tab.textContent = dia;
+    tab.onclick = () => { adminDiaActivo = i; renderAdminTabs(); };
+    tabsEl.appendChild(tab);
+
+    // Contenido
+    const div = document.createElement('div');
+    div.className = 'dia-contenido' + (i === adminDiaActivo ? ' activo' : '');
+    div.innerHTML = `
+      <div class="card">
+        <div class="card-title">🍛 Comidas — ${dia} <span style="color:var(--muted);font-weight:400">${menuDias[i].comidas.length > 0 ? '(' + menuDias[i].comidas.length + ')' : ''}</span></div>
+        <div class="items-grid" id="admin-comidas-${i}"></div>
+        <button class="btn-agregar" onclick="adminAgregarItem(${i}, 'comidas')">+ Agregar comida</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🥤 Bebidas — ${dia} <span style="color:var(--muted);font-weight:400">${menuDias[i].bebidas.length > 0 ? '(' + menuDias[i].bebidas.length + ')' : ''}</span></div>
+        <div class="items-grid" id="admin-bebidas-${i}"></div>
+        <button class="btn-agregar" onclick="adminAgregarItem(${i}, 'bebidas')">+ Agregar bebida</button>
+      </div>
+      <div class="card">
+        <div class="card-title">🍮 Postre — ${dia}</div>
+        <input type="text" value="${menuDias[i].postre}" placeholder="Ej: Flan con dulce de leche"
+          oninput="menuDias[${i}].postre = this.value">
+        <p style="font-size:0.75rem; color:var(--muted); margin-top:-0.4rem">Se muestra como información, no se elige.</p>
+      </div>
+    `;
+    contEl.appendChild(div);
+
+    // Render items si está activo
+    if (i === adminDiaActivo) {
+      setTimeout(() => {
+        renderAdminItems(i, 'comidas');
+        renderAdminItems(i, 'bebidas');
+      }, 0);
+    }
+  });
+}
+
+function renderAdminItems(diaIdx, tipo) {
+  const grid = document.getElementById(`admin-${tipo}-${diaIdx}`);
+  if (!grid) return;
+  const items = menuDias[diaIdx][tipo];
+  grid.innerHTML = '';
+
+  items.forEach((item, j) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <input type="text" value="${item}" placeholder="Nombre de la opción"
+        oninput="menuDias[${diaIdx}].${tipo}[${j}] = this.value">
+      <button class="btn-icon" onclick="adminEliminarItem(${diaIdx}, '${tipo}', ${j})">✕</button>
+    `;
+    grid.appendChild(row);
+  });
+}
+
+function adminAgregarItem(diaIdx, tipo) {
+  menuDias[diaIdx][tipo].push('');
+  renderAdminTabs();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll(`#admin-${tipo}-${diaIdx} input`);
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 10);
+}
+
+function adminEliminarItem(diaIdx, tipo, itemIdx) {
+  menuDias[diaIdx][tipo].splice(itemIdx, 1);
+  renderAdminTabs();
+}
+
+async function guardarMenu() {
+  const desde = document.getElementById('semana-desde').value.trim();
+  const hasta = document.getElementById('semana-hasta').value.trim();
+
+  if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
+
+  // Validar que cada día tenga al menos 1 comida y 1 bebida
+  for (let i = 0; i < menuDias.length; i++) {
+    const dia = menuDias[i];
+    const comidas = dia.comidas.filter(x => x.trim());
+    const bebidas = dia.bebidas.filter(x => x.trim());
+    if (comidas.length < 1) { toast(`⚠️ ${dia.nombre}: agregá al menos una comida`); adminDiaActivo = i; renderAdminTabs(); return; }
+    if (bebidas.length < 1) { toast(`⚠️ ${dia.nombre}: agregá al menos una bebida`); adminDiaActivo = i; renderAdminTabs(); return; }
+  }
+
+  // Limpiar items vacíos
+  const dias = menuDias.map(d => ({
+    nombre: d.nombre,
+    comidas: d.comidas.filter(x => x.trim()),
+    bebidas: d.bebidas.filter(x => x.trim()),
+    postre: d.postre.trim()
+  }));
+
+  const menu = { desde, hasta, dias, creado: Date.now() };
+  const saved = await saveMenu(menu);
+  if (!saved) { toast('❌ Error al guardar el menú'); return; }
+
+  const link = window.location.href.split('?')[0] + '?vista=form';
+  document.getElementById('link-texto').textContent = link;
+  document.getElementById('link-generado').style.display = 'block';
+  toast('✅ Menú guardado correctamente');
+}
+
+function copiarLink() {
+  const link = document.getElementById('link-texto').textContent;
+  navigator.clipboard.writeText(link).then(() => toast('✅ Link copiado'));
+}
+
+// ========== FORMULARIO ==========
+let grupoSeleccionado = null;
+let pedidosPorDia = {}; // { "Lunes": { comida: "...", bebida: "..." }, ... }
+
+async function cargarFormulario() {
+  const menu = await getMenu();
+
+  if (!menu) {
+    document.getElementById('form-sin-menu').style.display = 'block';
+    document.getElementById('form-contenido').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('form-sin-menu').style.display = 'none';
+  document.getElementById('form-contenido').style.display = 'block';
+  document.getElementById('form-semana-titulo').textContent =
+    `Semana del ${menu.desde} al ${menu.hasta}`;
+
+  // Grupos
+  const gg = document.getElementById('opciones-grupo');
+  gg.innerHTML = '';
+  GRUPOS.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'opcion-btn';
+    btn.textContent = g;
+    btn.onclick = () => { grupoSeleccionado = g; resaltarOpcion(gg, btn); };
+    gg.appendChild(btn);
+  });
+
+  // Días
+  pedidosPorDia = {};
+  const container = document.getElementById('form-dias-container');
+  container.innerHTML = '';
+
+  menu.dias.forEach(dia => {
+    pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
+
+    const section = document.createElement('div');
+    section.className = 'form-dia-section';
+
+    let postreHTML = '';
+    if (dia.postre) {
+      postreHTML = `<div class="form-dia-postre">🍮 Postre: ${dia.postre}</div>`;
+    }
+
+    section.innerHTML = `
+      <div class="form-dia-header">
+        <span>📅 ${dia.nombre}</span>
+        ${postreHTML}
+      </div>
+      <div class="form-dia-body">
+        <div style="margin-bottom:1rem">
+          <div class="card-title" style="margin-bottom:0.6rem">🍛 Comida</div>
+          <div class="opciones-grid" id="form-comida-${dia.nombre}"></div>
+        </div>
+        <div>
+          <div class="card-title" style="margin-bottom:0.6rem">🥤 Bebida</div>
+          <div class="opciones-grid" id="form-bebida-${dia.nombre}"></div>
+        </div>
+      </div>
+    `;
+    container.appendChild(section);
+
+    // Render opciones comida
+    setTimeout(() => {
+      const gc = document.getElementById(`form-comida-${dia.nombre}`);
+      dia.comidas.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'opcion-btn';
+        btn.textContent = c;
+        btn.onclick = () => { pedidosPorDia[dia.nombre].comida = c; resaltarOpcion(gc, btn); };
+        gc.appendChild(btn);
+      });
+
+      const gb = document.getElementById(`form-bebida-${dia.nombre}`);
+      dia.bebidas.forEach(b => {
+        const btn = document.createElement('button');
+        btn.className = 'opcion-btn';
+        btn.textContent = b;
+        btn.onclick = () => { pedidosPorDia[dia.nombre].bebida = b; resaltarOpcion(gb, btn); };
+        gb.appendChild(btn);
+      });
+    }, 0);
+  });
+
+  grupoSeleccionado = null;
+  document.getElementById('nombre-persona').value = '';
+  document.getElementById('ya-respondio').classList.remove('visible');
+  document.getElementById('btn-enviar').style.display = 'flex';
+}
+
+function resaltarOpcion(grid, btnActivo) {
+  grid.querySelectorAll('.opcion-btn').forEach(b => b.classList.remove('seleccionado'));
+  btnActivo.classList.add('seleccionado');
+}
+
+async function enviarPedido() {
+  const nombre = document.getElementById('nombre-persona').value.trim();
+  if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
+  if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
+  if (!menuActivo) { toast('❌ No hay menú activo'); return; }
+
+  // Validar que cada día tenga comida y bebida
+  const pedidos = [];
+  for (const dia of menuActivo.dias) {
+    const p = pedidosPorDia[dia.nombre];
+    if (!p || !p.comida) { toast(`⚠️ Elegí una comida para el ${dia.nombre}`); return; }
+    if (!p.bebida) { toast(`⚠️ Elegí una bebida para el ${dia.nombre}`); return; }
+    pedidos.push({ dia: dia.nombre, comida: p.comida, bebida: p.bebida });
+  }
+
+  const entrada = {
+    nombre,
+    grupo: grupoSeleccionado,
+    pedidos,
+    hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}),
+    menu_id: menuActivo.id
+  };
+
+  const ok = await saveRespuesta(entrada);
+  if (!ok) { toast('❌ Error al enviar el pedido'); return; }
+
+  const resumen = pedidos.map(p => `${p.dia}: ${p.comida} + ${p.bebida}`).join(' | ');
+  document.getElementById('ya-respondio-detalle').textContent =
+    `${grupoSeleccionado} · ${nombre}\n${resumen}`;
+  document.getElementById('ya-respondio').classList.add('visible');
+  document.getElementById('btn-enviar').style.display = 'none';
+  toast('✅ Pedido confirmado');
+}
+
+// ========== RESUMEN ==========
+let resumenDiaActivo = 0;
+let resumenRespuestas = [];
+
+async function cargarResumen() {
+  const menu = await getMenu();
+  resumenRespuestas = menu ? await getRespuestas(menu.id) : [];
+
+  if (!menu) {
+    document.getElementById('resumen-semana-titulo').textContent = 'No hay menú configurado';
+    document.getElementById('stat-total').textContent = '—';
+    document.getElementById('stat-pendientes').textContent = '—';
+    document.getElementById('resumen-sin-datos').style.display = 'block';
+    document.getElementById('resumen-datos').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('resumen-semana-titulo').textContent =
+    `Semana del ${menu.desde} al ${menu.hasta}`;
+  document.getElementById('stat-total').textContent = resumenRespuestas.length;
+  document.getElementById('stat-pendientes').textContent = Math.max(0, TOTAL_ESPERADO - resumenRespuestas.length);
+
+  if (resumenRespuestas.length === 0) {
+    document.getElementById('resumen-sin-datos').style.display = 'block';
+    document.getElementById('resumen-datos').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('resumen-sin-datos').style.display = 'none';
+  document.getElementById('resumen-datos').style.display = 'block';
+
+  // Tabs de días
+  const tabsEl = document.getElementById('resumen-dia-tabs');
+  tabsEl.innerHTML = '';
+  menu.dias.forEach((dia, i) => {
+    const tab = document.createElement('button');
+    tab.className = 'dia-tab' + (i === resumenDiaActivo ? ' activo' : '');
+    tab.textContent = dia.nombre;
+    tab.onclick = () => { resumenDiaActivo = i; renderResumenDia(); };
+    tabsEl.appendChild(tab);
+  });
+
+  renderResumenDia();
+}
+
+function renderResumenDia() {
+  const menu = menuActivo;
+  if (!menu || !menu.dias[resumenDiaActivo]) return;
+
+  const dia = menu.dias[resumenDiaActivo];
+  const diaName = dia.nombre;
+
+  // Actualizar tabs activo
+  document.querySelectorAll('#resumen-dia-tabs .dia-tab').forEach((t, i) => {
+    t.classList.toggle('activo', i === resumenDiaActivo);
+  });
+
+  // Postre
+  if (dia.postre) {
+    document.getElementById('resumen-postre').style.display = 'block';
+    document.getElementById('resumen-postre-texto').textContent = dia.postre;
+  } else {
+    document.getElementById('resumen-postre').style.display = 'none';
+  }
+
+  // Extraer pedidos del día seleccionado
+  const pedidosDelDia = [];
+  resumenRespuestas.forEach(r => {
+    if (r.pedidos) {
+      const p = r.pedidos.find(p => p.dia === diaName);
+      if (p) {
+        pedidosDelDia.push({ nombre: r.nombre, grupo: r.grupo, comida: p.comida, bebida: p.bebida });
+      }
+    }
+  });
+
+  // Barras comida
+  const contComida = {};
+  dia.comidas.forEach(c => contComida[c] = 0);
+  pedidosDelDia.forEach(p => { if (contComida[p.comida] !== undefined) contComida[p.comida]++; });
+  const maxC = Math.max(...Object.values(contComida), 1);
+  document.getElementById('barras-comida').innerHTML = Object.entries(contComida)
+    .sort((a,b) => b[1]-a[1])
+    .map(([nombre, cant]) => `
+      <div class="bar-item">
+        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(cant/maxC)*100}%"></div></div>
+      </div>`).join('');
+
+  // Barras bebida
+  const contBebida = {};
+  dia.bebidas.forEach(b => contBebida[b] = 0);
+  pedidosDelDia.forEach(p => { if (contBebida[p.bebida] !== undefined) contBebida[p.bebida]++; });
+  const maxB = Math.max(...Object.values(contBebida), 1);
+  document.getElementById('barras-bebida').innerHTML = Object.entries(contBebida)
+    .sort((a,b) => b[1]-a[1])
+    .map(([nombre, cant]) => `
+      <div class="bar-item">
+        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
+        <div class="bar-track"><div class="bar-fill bebida" style="width:${(cant/maxB)*100}%"></div></div>
+      </div>`).join('');
+
+  // Barras grupo
+  const contGrupo = {};
+  GRUPOS.forEach(g => contGrupo[g] = 0);
+  pedidosDelDia.forEach(p => { if (p.grupo && contGrupo[p.grupo] !== undefined) contGrupo[p.grupo]++; });
+  const maxG = Math.max(...Object.values(contGrupo), 1);
+  document.getElementById('barras-grupo').innerHTML = Object.entries(contGrupo)
+    .sort((a,b) => b[1]-a[1])
+    .map(([nombre, cant]) => `
+      <div class="bar-item">
+        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(cant/maxG)*100}%; background:#16a34a;"></div></div>
+      </div>`).join('');
+
+  // Lista personas
+  const sorted = [...pedidosDelDia].sort((a,b) => (a.grupo||'').localeCompare(b.grupo||''));
+  document.getElementById('lista-personas').innerHTML = sorted.map(r => `
+    <div class="persona-row">
+      <div class="persona-avatar">${r.nombre.charAt(0).toUpperCase()}</div>
+      <div style="flex:1">
+        <div class="persona-nombre">${r.nombre}</div>
+        <div style="font-size:0.68rem; color:var(--muted); margin-top:1px">${r.grupo || 'Sin grupo'}</div>
+      </div>
+      <div class="persona-detalle">${r.comida}<br>${r.bebida}</div>
+    </div>`).join('');
+}
+
+async function resetearRespuestas() {
+  if (!confirm('¿Limpiar todas las respuestas? Hacé esto solo cuando empiece una nueva semana.')) return;
+  if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
+  await deleteRespuestas(menuActivo.id);
+  await cargarResumen();
+  toast('🗑 Respuestas eliminadas');
+}
+
+// ========== INIT ==========
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('vista') === 'form') {
+    irA('form');
+    return;
+  }
+
+  // Cargar menú guardado en admin si existe
+  const menu = await getMenu();
+  if (menu && menu.dias) {
+    menuDias = menu.dias.map(d => ({
+      nombre: d.nombre,
+      comidas: [...d.comidas],
+      bebidas: [...d.bebidas],
+      postre: d.postre || ''
+    }));
+    document.getElementById('semana-desde').value = menu.desde;
+    document.getElementById('semana-hasta').value = menu.hasta;
+    const link = window.location.href.split('?')[0] + '?vista=form';
+    document.getElementById('link-texto').textContent = link;
+    document.getElementById('link-generado').style.display = 'block';
+  }
+
+  renderAdminTabs();
+  irA('resumen');
+}
+
+init();
+</script>
+</body>
+</html>
