@@ -7,7 +7,7 @@
 
 ## 1. Que es el proyecto?
 
-Una herramienta interna para **DHL** que permite organizar el pedido de comida semanal de sus empleados. El admin carga el menu (comidas, bebidas y postre distintos para cada dia de la semana), comparte un link, cada persona elige su pedido para los 7 dias, y el admin ve el resumen agrupado por equipo en tiempo real.
+Una herramienta interna para **DHL** que permite organizar el pedido de comida semanal de sus empleados. El admin carga el menu (comidas y postre por dia), las bebidas son fijas para toda la semana, comparte un link, cada persona elige su pedido para los 7 dias, y el admin ve el resumen agrupado por equipo en tiempo real.
 
 ---
 
@@ -117,6 +117,7 @@ Cada empleado envia un pedido para los 7 dias de la semana en una sola accion:
 ```javascript
 var DIAS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
 var GRUPOS = ["HUB AM", "HUB PM", "COURIER AM", "COURIER PM", "FORMAL AM", "FORMAL PM", "AFORO AM", "AFORO PM", "DENUNCIAS"];
+var BEBIDAS_FIJAS = ["Agua", "Gaseosa", "Jugo"];
 ```
 
 - **No hay limite** de cantidad de personas que pueden pedir. Antes era 30, fue eliminado.
@@ -136,11 +137,11 @@ var GRUPOS = ["HUB AM", "HUB PM", "COURIER AM", "COURIER PM", "FORMAL AM", "FORM
 - Campos "Desde" y "Hasta" para la semana (texto libre, ej: "24 de febrero")
 - **Tabs por dia** (Lunes a Domingo), cada uno con:
   - Lista de comidas (agregar/eliminar, cantidad libre)
-  - Lista de bebidas (agregar/eliminar, cantidad libre)
   - Campo de postre (texto libre, informativo)
+- **Bebidas fijas para toda la semana** (se toman de `BEBIDAS_FIJAS`, no se cargan por dia)
 - Boton "Guardar y generar link" → inserta nuevo registro en tabla `menu` y muestra URL
 - La URL del formulario es: `{dominio}?vista=form` (actualmente: `https://1kt0n.github.io/menu-semanal/?vista=form`)
-- Validacion: cada dia debe tener al menos 1 comida y 1 bebida
+- Validacion: cada dia debe tener al menos 1 comida
 
 ### 5.3 Formulario (`#vista-form`) — Acceso publico
 - Acceso via URL `?vista=form` (oculta tabs de Admin/Resumen/Login)
@@ -292,6 +293,7 @@ index.html (1200 lineas, archivo unico)
 5. **Deteccion de duplicados**: `saveRespuesta` busca por `nombre` (case-insensitive con `ilike`) + `menu_id`. Si existe, hace update; si no, insert.
 6. **GitHub Pages**: El archivo se llama `index.html` (no `menu-semanal.html`) para que GitHub Pages lo sirva como pagina principal.
 7. **RLS publico**: Las 3 tablas tienen Row Level Security habilitado con politicas que permiten todo (`FOR ALL USING (true)`). No hay autenticacion a nivel de Supabase — la autenticacion es a nivel de app (tabla `admins`).
+8. **Bebidas fijas**: El admin no carga bebidas por dia; se aplican automáticamente desde `BEBIDAS_FIJAS` a todos los dias del menu.
 
 ---
 

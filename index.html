@@ -523,7 +523,7 @@
 <!-- ======================== VISTA ADMIN ======================== -->
 <div class="vista" id="vista-admin">
   <h2>Configurar menú</h2>
-  <p class="desc">Configurá las opciones de comida, bebida y postre para cada día de la semana.</p>
+  <p class="desc">Configurá las opciones de comida y postre para cada día. Las bebidas son fijas para toda la semana.</p>
 
   <div class="card">
     <div class="card-title">📅 Semana</div>
@@ -655,6 +655,7 @@ var GRUPOS = [
   "AFORO PM",
   "DENUNCIAS"
 ];
+var BEBIDAS_FIJAS = ["Agua", "Gaseosa", "Jugo"];
 // Sin límite de pedidos
 
 // ========== SUPABASE CONFIG ==========
@@ -666,6 +667,10 @@ try {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } catch(e) {
   console.error('Error al inicializar Supabase:', e);
+}
+
+function getBebidasFijas() {
+  return (BEBIDAS_FIJAS || []).map(b => String(b || '').trim()).filter(Boolean);
 }
 
 // ========== SUPABASE HELPERS ==========
@@ -788,7 +793,7 @@ function toast(msg) {
 }
 
 // ========== ADMIN ==========
-var menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: [], postre: '' }));
+var menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: getBebidasFijas(), postre: '' }));
 var adminDiaActivo = 0;
 
 function renderAdminTabs() {
@@ -815,9 +820,11 @@ function renderAdminTabs() {
         <button class="btn-agregar" onclick="adminAgregarItem(${i}, 'comidas')">+ Agregar comida</button>
       </div>
       <div class="card">
-        <div class="card-title">🥤 Bebidas — ${dia} <span style="color:var(--muted);font-weight:400">${menuDias[i].bebidas.length > 0 ? '(' + menuDias[i].bebidas.length + ')' : ''}</span></div>
-        <div class="items-grid" id="admin-bebidas-${i}"></div>
-        <button class="btn-agregar" onclick="adminAgregarItem(${i}, 'bebidas')">+ Agregar bebida</button>
+        <div class="card-title">🥤 Bebidas — Fijas</div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.35rem">
+          ${getBebidasFijas().map(b => `<span style="background:var(--primary-light); color:var(--primary); padding:4px 10px; border-radius:999px; font-size:0.75rem; border:1px solid #fca5a5">${b}</span>`).join('')}
+        </div>
+        <p style="font-size:0.75rem; color:var(--muted); margin-top:0.6rem">Estas bebidas se aplican automáticamente a todos los días del menú.</p>
       </div>
       <div class="card">
         <div class="card-title">🍮 Postre — ${dia}</div>
@@ -832,7 +839,6 @@ function renderAdminTabs() {
     if (i === adminDiaActivo) {
       setTimeout(() => {
         renderAdminItems(i, 'comidas');
-        renderAdminItems(i, 'bebidas');
       }, 0);
     }
   });
@@ -873,23 +879,23 @@ function adminEliminarItem(diaIdx, tipo, itemIdx) {
 async function guardarMenu() {
   const desde = document.getElementById('semana-desde').value.trim();
   const hasta = document.getElementById('semana-hasta').value.trim();
+  const bebidasFijas = getBebidasFijas();
 
   if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
+  if (bebidasFijas.length < 1) { toast('⚠️ Configurá al menos una bebida fija'); return; }
 
-  // Validar que cada día tenga al menos 1 comida y 1 bebida
+  // Validar que cada día tenga al menos 1 comida
   for (let i = 0; i < menuDias.length; i++) {
     const dia = menuDias[i];
     const comidas = dia.comidas.filter(x => x.trim());
-    const bebidas = dia.bebidas.filter(x => x.trim());
     if (comidas.length < 1) { toast(`⚠️ ${dia.nombre}: agregá al menos una comida`); adminDiaActivo = i; renderAdminTabs(); return; }
-    if (bebidas.length < 1) { toast(`⚠️ ${dia.nombre}: agregá al menos una bebida`); adminDiaActivo = i; renderAdminTabs(); return; }
   }
 
   // Limpiar items vacíos
   const dias = menuDias.map(d => ({
     nombre: d.nombre,
     comidas: d.comidas.filter(x => x.trim()),
-    bebidas: d.bebidas.filter(x => x.trim()),
+    bebidas: [...bebidasFijas],
     postre: d.postre.trim()
   }));
 
@@ -1199,7 +1205,7 @@ async function cargarMenuEnAdmin() {
       return {
         nombre: nombre,
         comidas: Array.isArray(d.comidas) ? [...d.comidas] : [],
-        bebidas: Array.isArray(d.bebidas) ? [...d.bebidas] : [],
+        bebidas: getBebidasFijas(),
         postre: d.postre || ''
       };
     });
