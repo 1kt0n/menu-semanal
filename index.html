@@ -631,7 +631,17 @@
 <script>
 // ========== CONSTANTES ==========
 var DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-var GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
+var GRUPOS = [
+  "HUB AM",
+  "HUB PM",
+  "COURIER AM",
+  "COURIER PM",
+  "FORMAL AM",
+  "FORMAL PM",
+  "AFORO AM",
+  "AFORO PM",
+  "DENUNCIAS"
+];
 // Sin límite de pedidos
 
 // ========== SUPABASE CONFIG ==========
@@ -1098,9 +1108,15 @@ function renderResumenDia() {
     porEquipo[g].push(p);
   });
 
+  // Mantener el orden de GRUPOS y agregar al final equipos no previstos.
+  const gruposOrdenados = [...GRUPOS];
+  Object.keys(porEquipo).forEach(g => {
+    if (gruposOrdenados.indexOf(g) === -1) gruposOrdenados.push(g);
+  });
+
   // Renderizar cards por equipo
   let html = '';
-  GRUPOS.forEach(grupo => {
+  gruposOrdenados.forEach(grupo => {
     const personas = porEquipo[grupo];
     if (!personas || personas.length === 0) return;
 
