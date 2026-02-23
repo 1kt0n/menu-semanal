@@ -611,25 +611,7 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">🍛 Comidas pedidas</div>
-      <div id="barras-comida"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🥤 Bebidas pedidas</div>
-      <div id="barras-bebida"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🏢 Totales por equipo</div>
-      <div id="barras-grupo"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">👥 Detalle por persona</div>
-      <div class="personas-lista" id="lista-personas"></div>
-    </div>
+    <div id="resumen-equipos"></div>
 
     <button class="btn btn-outline btn-full" onclick="resetearRespuestas()" style="margin-top:0.5rem; color:var(--danger); border-color:var(--danger)">
       🗑 Limpiar respuestas (nueva semana)
@@ -1104,56 +1086,66 @@ function renderResumenDia() {
     }
   });
 
-  // Barras comida
-  const contComida = {};
-  dia.comidas.forEach(c => contComida[c] = 0);
-  pedidosDelDia.forEach(p => { if (contComida[p.comida] !== undefined) contComida[p.comida]++; });
-  const maxC = Math.max(...Object.values(contComida), 1);
-  document.getElementById('barras-comida').innerHTML = Object.entries(contComida)
-    .sort((a,b) => b[1]-a[1])
-    .map(([nombre, cant]) => `
-      <div class="bar-item">
-        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(cant/maxC)*100}%"></div></div>
+  // Agrupar por equipo
+  const porEquipo = {};
+  GRUPOS.forEach(g => porEquipo[g] = []);
+  pedidosDelDia.forEach(p => {
+    const g = p.grupo || 'Sin grupo';
+    if (!porEquipo[g]) porEquipo[g] = [];
+    porEquipo[g].push(p);
+  });
+
+  // Renderizar cards por equipo
+  let html = '';
+  GRUPOS.forEach(grupo => {
+    const personas = porEquipo[grupo];
+    if (!personas || personas.length === 0) return;
+
+    // Subtotales comida
+    const contComida = {};
+    personas.forEach(p => { contComida[p.comida] = (contComida[p.comida] || 0) + 1; });
+    const listaComida = Object.entries(contComida).sort((a,b) => b[1]-a[1])
+      .map(([nombre, cant]) => `<span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px">${cant}x ${nombre}</span>`).join(' ');
+
+    // Subtotales bebida
+    const contBebida = {};
+    personas.forEach(p => { contBebida[p.bebida] = (contBebida[p.bebida] || 0) + 1; });
+    const listaBebida = Object.entries(contBebida).sort((a,b) => b[1]-a[1])
+      .map(([nombre, cant]) => `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px">${cant}x ${nombre}</span>`).join(' ');
+
+    // Lista de personas
+    const listaPersonas = personas.map(r => `
+      <div class="persona-row">
+        <div class="persona-avatar">${r.nombre.charAt(0).toUpperCase()}</div>
+        <div style="flex:1">
+          <div class="persona-nombre">${r.nombre}</div>
+        </div>
+        <div class="persona-detalle">${r.comida}<br>${r.bebida}</div>
       </div>`).join('');
 
-  // Barras bebida
-  const contBebida = {};
-  dia.bebidas.forEach(b => contBebida[b] = 0);
-  pedidosDelDia.forEach(p => { if (contBebida[p.bebida] !== undefined) contBebida[p.bebida]++; });
-  const maxB = Math.max(...Object.values(contBebida), 1);
-  document.getElementById('barras-bebida').innerHTML = Object.entries(contBebida)
-    .sort((a,b) => b[1]-a[1])
-    .map(([nombre, cant]) => `
-      <div class="bar-item">
-        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
-        <div class="bar-track"><div class="bar-fill bebida" style="width:${(cant/maxB)*100}%"></div></div>
-      </div>`).join('');
+    html += `
+      <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
+          <h3 style="margin:0; font-size:1rem">${grupo}</h3>
+          <span style="background:var(--primary); color:#fff; padding:2px 10px; border-radius:10px; font-size:0.75rem">${personas.length} persona${personas.length > 1 ? 's' : ''}</span>
+        </div>
+        <div style="margin-bottom:0.5rem">
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:4px">🍛 Comidas</div>
+          <div style="display:flex; flex-wrap:wrap; gap:2px">${listaComida}</div>
+        </div>
+        <div style="margin-bottom:0.75rem">
+          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:4px">🥤 Bebidas</div>
+          <div style="display:flex; flex-wrap:wrap; gap:2px">${listaBebida}</div>
+        </div>
+        <div>${listaPersonas}</div>
+      </div>`;
+  });
 
-  // Barras grupo
-  const contGrupo = {};
-  GRUPOS.forEach(g => contGrupo[g] = 0);
-  pedidosDelDia.forEach(p => { if (p.grupo && contGrupo[p.grupo] !== undefined) contGrupo[p.grupo]++; });
-  const maxG = Math.max(...Object.values(contGrupo), 1);
-  document.getElementById('barras-grupo').innerHTML = Object.entries(contGrupo)
-    .sort((a,b) => b[1]-a[1])
-    .map(([nombre, cant]) => `
-      <div class="bar-item">
-        <div class="bar-header"><span>${nombre}</span><span class="bar-count">${cant}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(cant/maxG)*100}%; background:#16a34a;"></div></div>
-      </div>`).join('');
+  if (!html) {
+    html = '<div class="card" style="text-align:center; color:var(--muted)">No hay pedidos para este día</div>';
+  }
 
-  // Lista personas
-  const sorted = [...pedidosDelDia].sort((a,b) => (a.grupo||'').localeCompare(b.grupo||''));
-  document.getElementById('lista-personas').innerHTML = sorted.map(r => `
-    <div class="persona-row">
-      <div class="persona-avatar">${r.nombre.charAt(0).toUpperCase()}</div>
-      <div style="flex:1">
-        <div class="persona-nombre">${r.nombre}</div>
-        <div style="font-size:0.68rem; color:var(--muted); margin-top:1px">${r.grupo || 'Sin grupo'}</div>
-      </div>
-      <div class="persona-detalle">${r.comida}<br>${r.bebida}</div>
-    </div>`).join('');
+  document.getElementById('resumen-equipos').innerHTML = html;
 }
 
 async function resetearRespuestas() {
