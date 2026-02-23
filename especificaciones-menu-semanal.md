@@ -148,6 +148,7 @@ var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TO
 - Muestra semana configurada
 - Seleccion de equipo (botones tipo tarjeta, 9 opciones)
 - Campo nombre y apellido
+- Aviso visible debajo del nombre: "Importante: recordá no pedir tu menú en tus días francos o durante tus vacaciones."
 - **7 secciones, una por dia**, cada una con:
   - Header amarillo con nombre del dia
   - Opciones de comida (botones, seleccion unica)

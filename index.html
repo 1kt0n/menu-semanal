@@ -306,6 +306,23 @@
     .opcion-btn.seleccionado { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
     .opcion-btn.seleccionado::before { content: '✓ '; }
 
+    .nombre-aviso {
+      margin-top: 0.7rem;
+      padding: 0.7rem 0.8rem;
+      border: 1px solid #ffe580;
+      border-radius: 8px;
+      background: var(--yellow-light);
+      color: #7c5200;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .nombre-aviso strong {
+      color: #6b4500;
+      font-weight: 700;
+    }
+
     /* SECCIÓN DÍA EN FORMULARIO */
     .form-dia-section {
       border: 1px solid var(--border);
@@ -478,6 +495,7 @@
       .resumen-grid { grid-template-columns: 1fr 1fr; }
       .nav-tab { padding: 0.4rem 0.6rem; font-size: 0.75rem; }
       .dia-tab { padding: 0.4rem 0.7rem; font-size: 0.75rem; }
+      .nombre-aviso { font-size: 0.76rem; padding: 0.65rem 0.75rem; }
     }
   </style>
 </head>
@@ -579,6 +597,9 @@
     <div class="card">
       <div class="card-title">👤 Tu nombre</div>
       <input type="text" id="nombre-persona" placeholder="Ingresá tu nombre y apellido">
+      <div class="nombre-aviso">
+        <strong>Importante:</strong> recordá no pedir tu menú en tus días francos o durante tus vacaciones.
+      </div>
     </div>
 
     <div id="form-dias-container"></div>
