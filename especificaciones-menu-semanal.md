@@ -132,6 +132,7 @@ var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TO
 - Valida contra credenciales fijas definidas en frontend (`ADMIN_USUARIO` / `ADMIN_CLAVE`)
 - Al autenticar, setea `esAdmin = true` y muestra tabs Admin y Resumen
 - Ruta por defecto cuando se accede sin `?vista=form`
+- La ruta `/admin/` redirige al login de la app
 
 ### 5.2 Admin (`#vista-admin`) — Requiere login
 - Campos "Desde" y "Hasta" para la semana (texto libre, ej: "24 de febrero")
