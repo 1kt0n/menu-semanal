@@ -7,7 +7,7 @@
 
 ## 1. Que es el proyecto?
 
-Una herramienta interna para **DHL** que permite organizar el pedido de comida semanal de sus empleados. El admin carga el menu (comidas, bebidas y postre distintos para cada dia de la semana), comparte un link, cada persona elige su pedido para los 5 dias, y el admin ve el resumen agrupado por equipo en tiempo real.
+Una herramienta interna para **DHL** que permite organizar el pedido de comida semanal de sus empleados. El admin carga el menu (comidas, bebidas y postre distintos para cada dia de la semana), comparte un link, cada persona elige su pedido para los 7 dias, y el admin ve el resumen agrupado por equipo en tiempo real.
 
 ---
 
@@ -17,7 +17,7 @@ Una herramienta interna para **DHL** que permite organizar el pedido de comida s
 |------|-----------|---------|
 | Frontend | HTML + CSS + JS vanilla | Archivo unico `index.html`, sin frameworks ni build tools |
 | Backend | Supabase (PostgreSQL + REST API) | Acceso directo desde frontend via SDK JS |
-| Hosting | GitHub Pages | Repo: `https://github.com/1kt0n/menu-semanal` + custom domain `https://dhl.laposta.com` |
+| Hosting | GitHub Pages | Repo: `https://github.com/1kt0n/menu-semanal` |
 | CDN | Supabase JS SDK UMD | `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js` |
 | Fuente | Google Fonts — Inter (400-800) | Tipografia principal |
 
@@ -97,14 +97,16 @@ Cada dia tiene sus propias opciones de comida, bebida y postre:
 ```
 
 #### Tabla `respuestas` — Columna `pedidos` (JSONB)
-Cada empleado envia un pedido para los 5 dias de la semana en una sola accion:
+Cada empleado envia un pedido para los 7 dias de la semana en una sola accion:
 ```json
 [
   { "dia": "Lunes", "comida": "Milanesa napolitana", "bebida": "Agua" },
   { "dia": "Martes", "comida": "Ravioles", "bebida": "Gaseosa" },
   { "dia": "Miercoles", "comida": "Hamburguesa", "bebida": "Jugo" },
   { "dia": "Jueves", "comida": "Pollo", "bebida": "Agua" },
-  { "dia": "Viernes", "comida": "Pizza", "bebida": "Gaseosa" }
+  { "dia": "Viernes", "comida": "Pizza", "bebida": "Gaseosa" },
+  { "dia": "Sabado", "comida": "Tarta", "bebida": "Agua" },
+  { "dia": "Domingo", "comida": "Pasta", "bebida": "Jugo" }
 ]
 ```
 
@@ -113,9 +115,8 @@ Cada empleado envia un pedido para los 5 dias de la semana en una sola accion:
 ## 4. Constantes del negocio
 
 ```javascript
-var DIAS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
+var DIAS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
 var GRUPOS = ["HUB AM", "HUB PM", "COURIER AM", "COURIER PM", "FORMAL AM", "FORMAL PM", "AFORO AM", "AFORO PM", "DENUNCIAS"];
-var PUBLIC_FORM_BASE_URL = 'https://dhl.laposta.com';
 ```
 
 - **No hay limite** de cantidad de personas que pueden pedir. Antes era 30, fue eliminado.
@@ -133,12 +134,12 @@ var PUBLIC_FORM_BASE_URL = 'https://dhl.laposta.com';
 
 ### 5.2 Admin (`#vista-admin`) — Requiere login
 - Campos "Desde" y "Hasta" para la semana (texto libre, ej: "24 de febrero")
-- **Tabs por dia** (Lunes a Viernes), cada uno con:
+- **Tabs por dia** (Lunes a Domingo), cada uno con:
   - Lista de comidas (agregar/eliminar, cantidad libre)
   - Lista de bebidas (agregar/eliminar, cantidad libre)
   - Campo de postre (texto libre, informativo)
 - Boton "Guardar y generar link" → inserta nuevo registro en tabla `menu` y muestra URL
-- La URL del formulario es: `https://dhl.laposta.com/?vista=form` (fallback: `{dominio}?vista=form`)
+- La URL del formulario es: `{dominio}?vista=form` (actualmente: `https://1kt0n.github.io/menu-semanal/?vista=form`)
 - Validacion: cada dia debe tener al menos 1 comida y 1 bebida
 
 ### 5.3 Formulario (`#vista-form`) — Acceso publico
@@ -146,7 +147,7 @@ var PUBLIC_FORM_BASE_URL = 'https://dhl.laposta.com';
 - Muestra semana configurada
 - Seleccion de equipo (botones tipo tarjeta, 9 opciones)
 - Campo nombre y apellido
-- **5 secciones, una por dia**, cada una con:
+- **7 secciones, una por dia**, cada una con:
   - Header amarillo con nombre del dia
   - Opciones de comida (botones, seleccion unica)
   - Opciones de bebida (botones, seleccion unica)
@@ -253,7 +254,7 @@ index.html (1200 lineas, archivo unico)
 ### Empleado
 1. Recibe link `{url}?vista=form`
 2. Selecciona equipo, ingresa nombre
-3. Para cada dia (Lunes a Viernes): elige comida y bebida
+3. Para cada dia (Lunes a Domingo): elige comida y bebida
 4. Confirma pedido → se guarda en Supabase
 5. Si vuelve a entrar con el mismo nombre, actualiza su pedido
 
@@ -273,7 +274,7 @@ index.html (1200 lineas, archivo unico)
 | `irA(vista)` | Navega entre vistas con proteccion de rutas admin |
 | `renderAdminTabs()` | Renderiza tabs de dias + contenido de comidas/bebidas/postre |
 | `guardarMenu()` | Valida, limpia items vacios, guarda en Supabase |
-| `cargarFormulario()` | Carga menu desde Supabase, renderiza opciones para los 5 dias |
+| `cargarFormulario()` | Carga menu desde Supabase, renderiza opciones para los 7 dias |
 | `enviarPedido()` | Valida todo, construye array de pedidos, guarda en Supabase |
 | `cargarResumen()` | Carga menu + respuestas, renderiza tabs y llama `renderResumenDia()` |
 | `renderResumenDia()` | Agrupa pedidos por equipo, genera cards con subtotales y lista de personas |
@@ -291,7 +292,6 @@ index.html (1200 lineas, archivo unico)
 5. **Deteccion de duplicados**: `saveRespuesta` busca por `nombre` (case-insensitive con `ilike`) + `menu_id`. Si existe, hace update; si no, insert.
 6. **GitHub Pages**: El archivo se llama `index.html` (no `menu-semanal.html`) para que GitHub Pages lo sirva como pagina principal.
 7. **RLS publico**: Las 3 tablas tienen Row Level Security habilitado con politicas que permiten todo (`FOR ALL USING (true)`). No hay autenticacion a nivel de Supabase — la autenticacion es a nivel de app (tabla `admins`).
-8. **Dominio personalizado**: El repo incluye archivo `CNAME` con `dhl.laposta.com` y el DNS debe tener `CNAME dhl -> 1kt0n.github.io`.
 
 ---
 
