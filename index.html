@@ -655,6 +655,7 @@ var GRUPOS = [
   "AFORO PM",
   "DENUNCIAS"
 ];
+var PUBLIC_FORM_BASE_URL = 'https://dhl.laposta.com';
 // Sin límite de pedidos
 
 // ========== SUPABASE CONFIG ==========
@@ -666,6 +667,16 @@ try {
   db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 } catch(e) {
   console.error('Error al inicializar Supabase:', e);
+}
+
+function normalizarBaseUrl(url) {
+  return (url || '').trim().replace(/\/+$/, '');
+}
+
+function getFormularioPublicUrl() {
+  var basePersonalizada = normalizarBaseUrl(PUBLIC_FORM_BASE_URL);
+  if (basePersonalizada) return basePersonalizada + '/?vista=form';
+  return window.location.href.split('?')[0] + '?vista=form';
 }
 
 // ========== SUPABASE HELPERS ==========
@@ -897,7 +908,7 @@ async function guardarMenu() {
   const saved = await saveMenu(menu);
   if (!saved) { toast('❌ Error al guardar el menú'); return; }
 
-  const link = window.location.href.split('?')[0] + '?vista=form';
+  const link = getFormularioPublicUrl();
   document.getElementById('link-texto').textContent = link;
   document.getElementById('link-generado').style.display = 'block';
   toast('✅ Menú guardado correctamente');
@@ -1200,7 +1211,7 @@ async function cargarMenuEnAdmin() {
     }));
     document.getElementById('semana-desde').value = menu.desde;
     document.getElementById('semana-hasta').value = menu.hasta;
-    const link = window.location.href.split('?')[0] + '?vista=form';
+    const link = getFormularioPublicUrl();
     document.getElementById('link-texto').textContent = link;
     document.getElementById('link-generado').style.display = 'block';
   }

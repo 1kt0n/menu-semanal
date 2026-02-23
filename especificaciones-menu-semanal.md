@@ -17,7 +17,7 @@ Una herramienta interna para **DHL** que permite organizar el pedido de comida s
 |------|-----------|---------|
 | Frontend | HTML + CSS + JS vanilla | Archivo unico `index.html`, sin frameworks ni build tools |
 | Backend | Supabase (PostgreSQL + REST API) | Acceso directo desde frontend via SDK JS |
-| Hosting | GitHub Pages | Repo: `https://github.com/1kt0n/menu-semanal` |
+| Hosting | GitHub Pages | Repo: `https://github.com/1kt0n/menu-semanal` + custom domain `https://dhl.laposta.com` |
 | CDN | Supabase JS SDK UMD | `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js` |
 | Fuente | Google Fonts — Inter (400-800) | Tipografia principal |
 
@@ -114,7 +114,8 @@ Cada empleado envia un pedido para los 5 dias de la semana en una sola accion:
 
 ```javascript
 var DIAS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
-var GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"];
+var GRUPOS = ["HUB AM", "HUB PM", "COURIER AM", "COURIER PM", "FORMAL AM", "FORMAL PM", "AFORO AM", "AFORO PM", "DENUNCIAS"];
+var PUBLIC_FORM_BASE_URL = 'https://dhl.laposta.com';
 ```
 
 - **No hay limite** de cantidad de personas que pueden pedir. Antes era 30, fue eliminado.
@@ -137,13 +138,13 @@ var GRUPOS = ["HUB", "COURIER AM", "FORMAL", "DENUNCIAS", "AFORO", "COURIER PM"]
   - Lista de bebidas (agregar/eliminar, cantidad libre)
   - Campo de postre (texto libre, informativo)
 - Boton "Guardar y generar link" → inserta nuevo registro en tabla `menu` y muestra URL
-- La URL del formulario es: `{dominio}?vista=form`
+- La URL del formulario es: `https://dhl.laposta.com/?vista=form` (fallback: `{dominio}?vista=form`)
 - Validacion: cada dia debe tener al menos 1 comida y 1 bebida
 
 ### 5.3 Formulario (`#vista-form`) — Acceso publico
 - Acceso via URL `?vista=form` (oculta tabs de Admin/Resumen/Login)
 - Muestra semana configurada
-- Seleccion de equipo (botones tipo tarjeta, 6 opciones)
+- Seleccion de equipo (botones tipo tarjeta, 9 opciones)
 - Campo nombre y apellido
 - **5 secciones, una por dia**, cada una con:
   - Header amarillo con nombre del dia
@@ -290,6 +291,7 @@ index.html (1200 lineas, archivo unico)
 5. **Deteccion de duplicados**: `saveRespuesta` busca por `nombre` (case-insensitive con `ilike`) + `menu_id`. Si existe, hace update; si no, insert.
 6. **GitHub Pages**: El archivo se llama `index.html` (no `menu-semanal.html`) para que GitHub Pages lo sirva como pagina principal.
 7. **RLS publico**: Las 3 tablas tienen Row Level Security habilitado con politicas que permiten todo (`FOR ALL USING (true)`). No hay autenticacion a nivel de Supabase — la autenticacion es a nivel de app (tabla `admins`).
+8. **Dominio personalizado**: El repo incluye archivo `CNAME` con `dhl.laposta.com` y el DNS debe tener `CNAME dhl -> 1kt0n.github.io`.
 
 ---
 
