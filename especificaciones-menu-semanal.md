@@ -117,7 +117,7 @@ Cada empleado envia un pedido para los 7 dias de la semana en una sola accion:
 ```javascript
 var DIAS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
 var GRUPOS = ["HUB AM", "HUB PM", "COURIER AM", "COURIER PM", "FORMAL AM", "FORMAL PM", "AFORO AM", "AFORO PM", "DENUNCIAS"];
-var BEBIDAS_FIJAS = ["Agua", "Gaseosa", "Jugo"];
+var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TOROS", "MIRINDA", "JUGO POMELO", "JUGO MANZANA", "AGUA", "AGUA CON GAS"];
 ```
 
 - **No hay limite** de cantidad de personas que pueden pedir. Antes era 30, fue eliminado.
