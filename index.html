@@ -656,6 +656,8 @@ var GRUPOS = [
   "DENUNCIAS"
 ];
 var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TOROS", "MIRINDA", "JUGO POMELO", "JUGO MANZANA", "AGUA", "AGUA CON GAS"];
+var ADMIN_USUARIO = 'gtwezeiza';
+var ADMIN_CLAVE = 'operaciones2026';
 // Sin límite de pedidos
 
 // ========== SUPABASE CONFIG ==========
@@ -740,14 +742,7 @@ async function deleteRespuestas(menuId) {
 var esAdmin = false;
 
 async function verificarAdmin(usuario, clave) {
-  if (!db) return false;
-  const { data } = await db
-    .from('admins')
-    .select('id')
-    .eq('usuario', usuario)
-    .eq('clave', clave)
-    .maybeSingle();
-  return !!data;
+  return usuario === ADMIN_USUARIO && clave === ADMIN_CLAVE;
 }
 
 async function loginAdmin() {

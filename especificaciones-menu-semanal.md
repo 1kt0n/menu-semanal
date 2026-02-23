@@ -129,7 +129,7 @@ var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TO
 
 ### 5.1 Login (`#vista-login`)
 - Formulario con usuario y contraseña (texto plano)
-- Valida contra tabla `admins` en Supabase
+- Valida contra credenciales fijas definidas en frontend (`ADMIN_USUARIO` / `ADMIN_CLAVE`)
 - Al autenticar, setea `esAdmin = true` y muestra tabs Admin y Resumen
 - Ruta por defecto cuando se accede sin `?vista=form`
 
@@ -270,7 +270,7 @@ index.html (1200 lineas, archivo unico)
 | `getRespuestas(menuId)` | Obtiene todas las respuestas para un menu especifico |
 | `saveRespuesta(resp)` | Inserta o actualiza respuesta (busca por nombre case-insensitive + menu_id) |
 | `deleteRespuestas(menuId)` | Elimina todas las respuestas de un menu |
-| `verificarAdmin(user, pass)` | Verifica credenciales contra tabla `admins` |
+| `verificarAdmin(user, pass)` | Verifica credenciales fijas (`ADMIN_USUARIO` y `ADMIN_CLAVE`) |
 | `loginAdmin()` | Lee inputs, verifica, setea `esAdmin=true`, muestra tabs |
 | `irA(vista)` | Navega entre vistas con proteccion de rutas admin |
 | `renderAdminTabs()` | Renderiza tabs de dias + contenido de comidas/bebidas/postre |
@@ -294,6 +294,7 @@ index.html (1200 lineas, archivo unico)
 6. **GitHub Pages**: El archivo se llama `index.html` (no `menu-semanal.html`) para que GitHub Pages lo sirva como pagina principal.
 7. **RLS publico**: Las 3 tablas tienen Row Level Security habilitado con politicas que permiten todo (`FOR ALL USING (true)`). No hay autenticacion a nivel de Supabase — la autenticacion es a nivel de app (tabla `admins`).
 8. **Bebidas fijas**: El admin no carga bebidas por dia; se aplican automáticamente desde `BEBIDAS_FIJAS` a todos los dias del menu.
+9. **Credenciales admin actuales**: `ADMIN_USUARIO = 'gtwezeiza'` y `ADMIN_CLAVE = 'operaciones2026'`.
 
 ---
 
