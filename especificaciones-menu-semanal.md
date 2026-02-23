@@ -72,7 +72,7 @@ ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_admins" ON admins FOR ALL USING (true) WITH CHECK (true);
 
 -- Admin inicial
-INSERT INTO admins (usuario, clave) VALUES ('admin', 'admin123');
+INSERT INTO admins (usuario, clave) VALUES ('gtwezeiza', 'operaciones2026');
 ```
 
 ### Modelo de datos
