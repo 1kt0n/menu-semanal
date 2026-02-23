@@ -470,11 +470,33 @@
 <nav>
   <div class="nav-logo">🍽️ Menú Semanal</div>
   <div class="nav-tabs">
-    <button class="nav-tab" id="tab-admin" onclick="irA('admin')">⚙️ Admin</button>
+    <button class="nav-tab" id="tab-login" onclick="irA('login')" style="display:none">🔑 Login</button>
+    <button class="nav-tab" id="tab-admin" onclick="irA('admin')" style="display:none">⚙️ Admin</button>
     <button class="nav-tab" id="tab-form" onclick="irA('form')">📋 Formulario</button>
-    <button class="nav-tab activo" id="tab-resumen" onclick="irA('resumen')">📊 Resumen</button>
+    <button class="nav-tab" id="tab-resumen" onclick="irA('resumen')" style="display:none">📊 Resumen</button>
   </div>
 </nav>
+
+<!-- ======================== VISTA LOGIN ======================== -->
+<div class="vista" id="vista-login">
+  <div style="max-width:380px; margin:2rem auto;">
+    <div style="text-align:center; margin-bottom:2rem;">
+      <div style="font-size:2.5rem; margin-bottom:0.5rem;">🔐</div>
+      <h2>Acceso administrador</h2>
+      <p class="desc" style="margin-bottom:0">Ingresá tus credenciales para gestionar el menú.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">👤 Credenciales</div>
+      <label>Usuario</label>
+      <input type="text" id="login-usuario" placeholder="Tu usuario">
+      <label>Contraseña</label>
+      <input type="text" id="login-clave" placeholder="Tu contraseña" onkeydown="if(event.key==='Enter') loginAdmin()">
+      <button class="btn btn-primary btn-full" onclick="loginAdmin()" style="margin-top:0.5rem">
+        Ingresar →
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ======================== VISTA ADMIN ======================== -->
 <div class="vista" id="vista-admin">
@@ -552,7 +574,7 @@
 </div>
 
 <!-- ======================== VISTA RESUMEN ======================== -->
-<div class="vista activa" id="vista-resumen">
+<div class="vista" id="vista-resumen">
 
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.3rem">
     <h2>Resumen semanal</h2>
@@ -699,12 +721,50 @@ async function deleteRespuestas(menuId) {
   if (error) console.error('Error al eliminar respuestas:', error);
 }
 
+// ========== AUTENTICACIÓN ==========
+var esAdmin = false;
+
+async function verificarAdmin(usuario, clave) {
+  if (!db) return false;
+  const { data } = await db
+    .from('admins')
+    .select('id')
+    .eq('usuario', usuario)
+    .eq('clave', clave)
+    .maybeSingle();
+  return !!data;
+}
+
+async function loginAdmin() {
+  var usuario = document.getElementById('login-usuario').value.trim();
+  var clave = document.getElementById('login-clave').value.trim();
+  if (!usuario || !clave) { toast('⚠️ Ingresá usuario y contraseña'); return; }
+
+  var ok = await verificarAdmin(usuario, clave);
+  if (!ok) { toast('❌ Usuario o contraseña incorrectos'); return; }
+
+  esAdmin = true;
+  document.getElementById('tab-admin').style.display = '';
+  document.getElementById('tab-resumen').style.display = '';
+  document.getElementById('tab-login').style.display = 'none';
+  toast('✅ Bienvenido, ' + usuario);
+  await cargarMenuEnAdmin();
+  irA('admin');
+}
+
 // ========== NAVEGACIÓN ==========
 function irA(vista) {
+  // Proteger vistas de admin
+  if ((vista === 'admin' || vista === 'resumen') && !esAdmin) {
+    irA('login');
+    return;
+  }
+
   document.querySelectorAll('.vista').forEach(v => v.classList.remove('activa'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('activo'));
   document.getElementById('vista-' + vista).classList.add('activa');
-  document.getElementById('tab-' + vista).classList.add('activo');
+  var tab = document.getElementById('tab-' + vista);
+  if (tab) tab.classList.add('activo');
   if (vista === 'form') cargarFormulario();
   if (vista === 'resumen') cargarResumen();
 }
@@ -1105,14 +1165,7 @@ async function resetearRespuestas() {
 }
 
 // ========== INIT ==========
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('vista') === 'form') {
-    irA('form');
-    return;
-  }
-
-  // Cargar menú guardado en admin si existe
+async function cargarMenuEnAdmin() {
   const menu = await getMenu();
   if (menu && menu.dias) {
     menuDias = menu.dias.map(d => ({
@@ -1127,9 +1180,24 @@ async function init() {
     document.getElementById('link-texto').textContent = link;
     document.getElementById('link-generado').style.display = 'block';
   }
-
   renderAdminTabs();
-  irA('resumen');
+}
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+
+  // Empleados: solo ven el formulario
+  if (params.get('vista') === 'form') {
+    document.getElementById('tab-admin').style.display = 'none';
+    document.getElementById('tab-resumen').style.display = 'none';
+    document.getElementById('tab-login').style.display = 'none';
+    irA('form');
+    return;
+  }
+
+  // Admin: mostrar login
+  document.getElementById('tab-login').style.display = '';
+  irA('login');
 }
 
 init();
