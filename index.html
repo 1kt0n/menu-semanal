@@ -489,6 +489,7 @@
     .success-box.visible { display: block; }
     .success-box h3 { font-size: 1.2rem; color: var(--primary); margin-bottom: 0.5rem; }
     .success-box p { font-size: 0.82rem; color: var(--text); }
+    #ya-respondio-detalle { white-space: pre-line; }
 
     @media (max-width: 480px) {
       .opciones-grid { grid-template-columns: 1fr; }
@@ -1026,7 +1027,7 @@ function resaltarOpcion(grid, btnActivo) {
   btnActivo.classList.add('seleccionado');
 }
 
-async function enviarPedido() {
+async function enviarPedidoLegacy() {
   const nombre = document.getElementById('nombre-persona').value.trim();
   if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
   if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
@@ -1061,6 +1062,66 @@ async function enviarPedido() {
 }
 
 // ========== RESUMEN ==========
+// Sobrescribe la validación para permitir días sin pedido (franco/vacaciones).
+async function enviarPedido() {
+  var nombre = document.getElementById('nombre-persona').value.trim();
+  if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
+  if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
+  if (!menuActivo) { toast('❌ No hay menú activo'); return; }
+
+  var pedidos = [];
+  var diasSinPedido = [];
+
+  for (var i = 0; i < menuActivo.dias.length; i++) {
+    var dia = menuActivo.dias[i];
+    var p = pedidosPorDia[dia.nombre] || {};
+    var tieneComida = !!p.comida;
+    var tieneBebida = !!p.bebida;
+
+    if (tieneComida && tieneBebida) {
+      pedidos.push({ dia: dia.nombre, comida: p.comida, bebida: p.bebida });
+      continue;
+    }
+
+    if (!tieneComida && !tieneBebida) {
+      diasSinPedido.push(dia.nombre);
+      continue;
+    }
+
+    if (tieneComida && !tieneBebida) {
+      toast('⚠️ ' + dia.nombre + ': elegí bebida o dejá el día sin pedido');
+      return;
+    }
+
+    toast('⚠️ ' + dia.nombre + ': elegí comida o dejá el día sin pedido');
+    return;
+  }
+
+  if (pedidos.length === 0) {
+    toast('⚠️ Seleccioná al menos un día para pedir menú');
+    return;
+  }
+
+  var entrada = {
+    nombre: nombre,
+    grupo: grupoSeleccionado,
+    pedidos: pedidos,
+    hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}),
+    menu_id: menuActivo.id
+  };
+
+  var ok = await saveRespuesta(entrada);
+  if (!ok) { toast('❌ Error al enviar el pedido'); return; }
+
+  var resumen = pedidos.map(function(p) { return p.dia + ': ' + p.comida + ' + ' + p.bebida; }).join('\n');
+  var sinPedido = diasSinPedido.length ? '\nSin pedido: ' + diasSinPedido.join(', ') : '';
+  document.getElementById('ya-respondio-detalle').textContent =
+    grupoSeleccionado + ' · ' + nombre + '\n' + resumen + sinPedido;
+  document.getElementById('ya-respondio').classList.add('visible');
+  document.getElementById('btn-enviar').style.display = 'none';
+  toast('✅ Pedido confirmado');
+}
+
 var resumenDiaActivo = 0;
 var resumenRespuestas = [];
 

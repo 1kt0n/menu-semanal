@@ -97,7 +97,7 @@ Cada dia tiene sus propias opciones de comida, bebida y postre:
 ```
 
 #### Tabla `respuestas` — Columna `pedidos` (JSONB)
-Cada empleado envia un pedido para los 7 dias de la semana en una sola accion:
+Cada empleado envia en una sola accion los pedidos de los dias en los que trabaja (puede omitir dias francos/vacaciones):
 ```json
 [
   { "dia": "Lunes", "comida": "Milanesa napolitana", "bebida": "Agua" },
@@ -154,9 +154,9 @@ var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TO
   - Opciones de comida (botones, seleccion unica)
   - Opciones de bebida (botones, seleccion unica)
   - Postre del dia (informativo, no seleccionable)
-- Validacion: equipo, nombre, y comida+bebida de cada dia son obligatorios
+- Validacion: equipo y nombre obligatorios; para cada dia se debe elegir comida+bebida o dejar ambos sin seleccionar
 - Si la persona ya respondio (mismo nombre, case-insensitive via `ilike`), actualiza su pedido
-- Mensaje de confirmacion con detalle del pedido
+- Mensaje de confirmacion con detalle del pedido y lista de dias sin pedido
 
 ### 5.4 Resumen (`#vista-resumen`) — Requiere login
 - Titulo de la semana + contador de respuestas recibidas (sin limite/pendientes)
@@ -277,7 +277,7 @@ index.html (1200 lineas, archivo unico)
 | `renderAdminTabs()` | Renderiza tabs de dias + contenido de comidas/bebidas/postre |
 | `guardarMenu()` | Valida, limpia items vacios, guarda en Supabase |
 | `cargarFormulario()` | Carga menu desde Supabase, renderiza opciones para los 7 dias |
-| `enviarPedido()` | Valida todo, construye array de pedidos, guarda en Supabase |
+| `enviarPedido()` | Valida todo, permite dias sin pedido, construye array de pedidos y guarda en Supabase |
 | `cargarResumen()` | Carga menu + respuestas, renderiza tabs y llama `renderResumenDia()` |
 | `renderResumenDia()` | Agrupa pedidos por equipo, genera cards con subtotales y lista de personas |
 | `resetearRespuestas()` | Elimina todas las respuestas con confirmacion |
