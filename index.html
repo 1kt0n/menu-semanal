@@ -556,6 +556,11 @@
         <input type="text" id="semana-hasta" placeholder="Ej: 28 de febrero">
       </div>
     </div>
+    <div>
+      <label>Fecha límite para tomar pedidos</label>
+      <input type="datetime-local" id="semana-fecha-limite" style="margin-bottom:0">
+      <p style="font-size:0.75rem; color:var(--muted); margin-top:0.45rem">Al llegar esta fecha, el formulario se cierra automáticamente.</p>
+    </div>
   </div>
 
   <div class="dia-tabs" id="admin-dia-tabs"></div>
@@ -582,6 +587,11 @@
   <div id="form-sin-menu" class="empty" style="display:none">
     <div class="empty-icon">⚠️</div>
     <p>No hay un menú configurado todavía.<br>Pedile al admin que configure el menú primero.</p>
+  </div>
+
+  <div id="form-cerrado" class="empty" style="display:none">
+    <div class="empty-icon">🔒</div>
+    <p id="form-cerrado-texto">Los pedidos para esta semana ya están cerrados.</p>
   </div>
 
   <div id="form-contenido" style="display:none">
@@ -763,8 +773,8 @@ function parseFechaBaseSemana(texto) {
   return null;
 }
 
-function getEtiquetaDia(nombreDia, fechaDesdeTexto) {
-  var idx = DIAS.indexOf(nombreDia);
+function getEtiquetaDia(nombreDia, fechaDesdeTexto, idxOpcional) {
+  var idx = typeof idxOpcional === 'number' ? idxOpcional : DIAS.indexOf(nombreDia);
   if (idx < 0) return nombreDia;
 
   var base = parseFechaBaseSemana(fechaDesdeTexto);
@@ -773,6 +783,81 @@ function getEtiquetaDia(nombreDia, fechaDesdeTexto) {
   var fechaDia = new Date(base.getTime());
   fechaDia.setDate(fechaDia.getDate() + idx);
   return nombreDia + ' ' + fechaDia.getDate() + '-' + (fechaDia.getMonth() + 1);
+}
+
+function toDateTimeLocalValue(valor) {
+  if (!valor) return '';
+  var d = new Date(valor);
+  if (isNaN(d.getTime())) return '';
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function parseDateTimeLocalToISO(valor) {
+  var raw = String(valor || '').trim();
+  if (!raw) return null;
+  var d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function getDayNameFromDate(fecha) {
+  var idx = fecha.getDay(); // 0 domingo ... 6 sabado
+  var map = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sabado'];
+  return map[idx] || null;
+}
+
+function getDiasOrdenadosPorDesde(diasNormalizados, desdeTexto) {
+  var base = parseFechaBaseSemana(desdeTexto);
+  if (!base) return diasNormalizados.slice();
+
+  var nombreInicio = getDayNameFromDate(base);
+  if (!nombreInicio) return diasNormalizados.slice();
+
+  var idxInicio = DIAS.indexOf(nombreInicio);
+  if (idxInicio < 0) return diasNormalizados.slice();
+
+  var orden = DIAS.slice(idxInicio).concat(DIAS.slice(0, idxInicio));
+  var porNombre = {};
+  for (var i = 0; i < diasNormalizados.length; i++) porNombre[diasNormalizados[i].nombre] = diasNormalizados[i];
+
+  var salida = [];
+  for (var j = 0; j < orden.length; j++) {
+    var n = orden[j];
+    if (porNombre[n]) salida.push(porNombre[n]);
+  }
+  return salida;
+}
+
+var soporteCierreMenu = null;
+async function detectarSoporteCierreMenu() {
+  if (soporteCierreMenu !== null) return soporteCierreMenu;
+  if (!db) { soporteCierreMenu = false; return soporteCierreMenu; }
+  const { error } = await db.from('menu').select('id,fecha_limite,cerrado').limit(1);
+  soporteCierreMenu = !error;
+  if (error) console.warn('Sin columnas de cierre en menu. Ejecutá el SQL de actualización.', error);
+  return soporteCierreMenu;
+}
+
+function menuEstaCerrado(menu) {
+  if (!menu) return true;
+  if (menu.cerrado === true) return true;
+  if (!menu.fecha_limite) return false;
+  var limite = new Date(menu.fecha_limite);
+  if (isNaN(limite.getTime())) return false;
+  return Date.now() > limite.getTime();
+}
+
+function descripcionCierreMenu(menu) {
+  if (!menu) return 'No hay menú activo.';
+  if (menu.cerrado === true) return 'Los pedidos de esta semana están cerrados por administración.';
+  if (menu.fecha_limite) {
+    var limite = new Date(menu.fecha_limite);
+    if (!isNaN(limite.getTime()) && Date.now() > limite.getTime()) {
+      return 'La fecha límite de pedidos ya venció (' + limite.toLocaleString('es-AR') + ').';
+    }
+  }
+  return '';
 }
 
 // ========== SUPABASE HELPERS ==========
@@ -1091,10 +1176,13 @@ function adminEliminarItem(diaIdx, tipo, itemIdx) {
 async function guardarMenu() {
   const desde = document.getElementById('semana-desde').value.trim();
   const hasta = document.getElementById('semana-hasta').value.trim();
+  const fechaLimiteInput = document.getElementById('semana-fecha-limite').value;
   const bebidasFijas = getBebidasFijas();
 
   if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
   if (bebidasFijas.length < 1) { toast('⚠️ Configurá al menos una bebida fija'); return; }
+  var fechaLimiteISO = parseDateTimeLocalToISO(fechaLimiteInput);
+  if (fechaLimiteInput && !fechaLimiteISO) { toast('⚠️ Fecha límite inválida'); return; }
 
   // Normalizar y permitir días vacíos (ej. sábado/domingo aún no definidos).
   // Se guarda únicamente lo que tenga al menos una comida para evitar días "vacíos" en el formulario.
@@ -1114,8 +1202,18 @@ async function guardarMenu() {
   if (diasConComida < 1) { toast('⚠️ Cargá al menos una comida en algún día'); return; }
 
   var dias = diasNormalizados.filter(function(d) { return d.comidas.length > 0; });
+  dias = getDiasOrdenadosPorDesde(dias, desde);
 
-  const menu = { desde, hasta, dias, creado: Date.now() };
+  var menu = { desde: desde, hasta: hasta, dias: dias, creado: Date.now() };
+  var tieneCierre = await detectarSoporteCierreMenu();
+  if (!tieneCierre && fechaLimiteInput) {
+    toast('⚠️ Falta SQL de cierre para guardar fecha límite.');
+    return;
+  }
+  if (tieneCierre) {
+    menu.fecha_limite = fechaLimiteISO;
+    menu.cerrado = false;
+  }
   const saved = await saveMenu(menu);
   if (!saved) { toast('❌ Error al guardar el menú'); return; }
 
@@ -1141,11 +1239,19 @@ async function cargarFormulario() {
 
   if (!menu) {
     document.getElementById('form-sin-menu').style.display = 'block';
+    document.getElementById('form-cerrado').style.display = 'none';
     document.getElementById('form-contenido').style.display = 'none';
     return;
   }
 
   document.getElementById('form-sin-menu').style.display = 'none';
+  if (menuEstaCerrado(menu)) {
+    document.getElementById('form-cerrado').style.display = 'block';
+    document.getElementById('form-cerrado-texto').textContent = descripcionCierreMenu(menu);
+    document.getElementById('form-contenido').style.display = 'none';
+    return;
+  }
+  document.getElementById('form-cerrado').style.display = 'none';
   document.getElementById('form-contenido').style.display = 'block';
   document.getElementById('form-semana-titulo').textContent =
     `Semana del ${menu.desde} al ${menu.hasta}`;
@@ -1166,8 +1272,8 @@ async function cargarFormulario() {
   const container = document.getElementById('form-dias-container');
   container.innerHTML = '';
 
-  menu.dias.forEach(dia => {
-    var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde);
+  menu.dias.forEach(function(dia, idxDia) {
+    var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde, idxDia);
     pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
     var comidasDia = (Array.isArray(dia.comidas) ? dia.comidas : []).filter(function(x) { return x && String(x).trim(); });
     var bebidasDia = (Array.isArray(dia.bebidas) ? dia.bebidas : []).filter(function(x) { return x && String(x).trim(); });
@@ -1283,6 +1389,7 @@ async function enviarPedido() {
   if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
   if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
   if (!menuActivo) { toast('❌ No hay menú activo'); return; }
+  if (menuEstaCerrado(menuActivo)) { toast('🔒 Los pedidos de esta semana están cerrados'); return; }
 
   var pedidos = [];
   var diasSinPedido = [];
@@ -1453,11 +1560,26 @@ function exportarResumenCSV() {
   toast('✅ CSV exportado');
 }
 
-function cerrarSemana() {
+async function cerrarSemana() {
   if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
-  if (!confirm('Cerrar semana no borra pedidos. Luego podrás cargar una nueva semana. ¿Continuar?')) return;
-  irA('admin');
-  toast('🔒 Semana cerrada. Cargá la nueva semana y guardá para abrir el próximo formulario.');
+  var tieneCierre = await detectarSoporteCierreMenu();
+  if (!tieneCierre) {
+    toast('⚠️ Falta SQL de cierre. Pedime el script y te lo paso.');
+    return;
+  }
+  if (!confirm('Cerrar semana bloqueará nuevos pedidos, sin borrar el historial. ¿Continuar?')) return;
+
+  const { data, error } = await db
+    .from('menu')
+    .update({ cerrado: true })
+    .eq('id', menuActivo.id)
+    .select()
+    .single();
+
+  if (error) { console.error('Error al cerrar semana:', error); toast('❌ No se pudo cerrar la semana'); return; }
+  menuActivo = data;
+  await cargarResumen();
+  toast('🔒 Semana cerrada. Ahora podés exportar CSV y cargar la próxima.');
 }
 
 async function cargarResumen() {
@@ -1472,8 +1594,14 @@ async function cargarResumen() {
     return;
   }
 
+  var estado = menuEstaCerrado(menu) ? 'Cerrado' : 'Abierto';
+  var limiteTxt = '';
+  if (menu.fecha_limite) {
+    var limiteFecha = new Date(menu.fecha_limite);
+    if (!isNaN(limiteFecha.getTime())) limiteTxt = ' · Límite: ' + limiteFecha.toLocaleString('es-AR');
+  }
   document.getElementById('resumen-semana-titulo').textContent =
-    `Semana del ${menu.desde} al ${menu.hasta}`;
+    `Semana del ${menu.desde} al ${menu.hasta} · Estado: ${estado}${limiteTxt}`;
   document.getElementById('stat-total').textContent = resumenRespuestas.length;
 
   if (resumenRespuestas.length === 0) {
@@ -1492,7 +1620,7 @@ async function cargarResumen() {
   menu.dias.forEach((dia, i) => {
     const tab = document.createElement('button');
     tab.className = 'dia-tab' + (i === resumenDiaActivo ? ' activo' : '');
-    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde);
+    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde, i);
     tab.onclick = () => { resumenDiaActivo = i; renderResumenDia(); };
     tabsEl.appendChild(tab);
   });
@@ -1601,7 +1729,7 @@ function renderResumenDia() {
 }
 
 async function resetearRespuestas() {
-  cerrarSemana();
+  await cerrarSemana();
 }
 
 // ========== INIT ==========
@@ -1621,15 +1749,19 @@ async function cargarMenuEnAdmin() {
     });
     document.getElementById('semana-desde').value = menu.desde;
     document.getElementById('semana-hasta').value = menu.hasta;
+    document.getElementById('semana-fecha-limite').value = toDateTimeLocalValue(menu.fecha_limite);
     const link = window.location.href.split('?')[0] + '?vista=form';
     document.getElementById('link-texto').textContent = link;
     document.getElementById('link-generado').style.display = 'block';
+  } else {
+    document.getElementById('semana-fecha-limite').value = '';
   }
   renderAdminTabs();
 }
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
+  await detectarSoporteCierreMenu();
 
   // Empleados: solo ven el formulario
   if (params.get('vista') === 'form') {
