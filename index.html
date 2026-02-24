@@ -930,12 +930,11 @@ async function guardarMenu() {
   if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
   if (bebidasFijas.length < 1) { toast('⚠️ Configurá al menos una bebida fija'); return; }
 
-  // Validar que cada día tenga al menos 1 comida
-  for (let i = 0; i < menuDias.length; i++) {
-    const dia = menuDias[i];
-    const comidas = dia.comidas.filter(x => x.trim());
-    if (comidas.length < 1) { toast(`⚠️ ${dia.nombre}: agregá al menos una comida`); adminDiaActivo = i; renderAdminTabs(); return; }
-  }
+  // Permitir días vacíos (ej. sábado/domingo aún no definidos), pero exigir al menos un día cargado.
+  var diasConComida = menuDias.filter(function(d) {
+    return d.comidas.filter(function(x) { return x.trim(); }).length > 0;
+  }).length;
+  if (diasConComida < 1) { toast('⚠️ Cargá al menos una comida en algún día'); return; }
 
   // Limpiar items vacíos
   const dias = menuDias.map(d => ({
