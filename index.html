@@ -639,6 +639,23 @@
   </div>
 
   <div id="resumen-datos" style="display:none">
+    <div class="card" style="margin-bottom:1rem; padding:1rem;">
+      <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1; min-width:220px;">
+          <label for="resumen-filtro-equipo">Filtrar por equipo</label>
+          <select id="resumen-filtro-equipo" onchange="onChangeResumenFiltroEquipo()" style="width:100%; border:1px solid var(--border); border-radius:7px; padding:0.65rem 0.9rem; font-size:0.88rem; font-family:'Inter', sans-serif; color:var(--text); background:#fff;">
+            <option value="__TODOS__">Todos los equipos</option>
+          </select>
+        </div>
+        <button class="btn btn-outline" onclick="exportarResumenCSV()" style="font-size:0.82rem; padding:0.6rem 1rem;">
+          ⬇ Exportar CSV semanal
+        </button>
+        <button class="btn btn-outline" onclick="cerrarSemana()" style="font-size:0.82rem; padding:0.6rem 1rem; color:var(--danger); border-color:var(--danger);">
+          🔒 Cerrar semana (sin borrar)
+        </button>
+      </div>
+    </div>
+
     <div class="dia-tabs" id="resumen-dia-tabs"></div>
 
     <div id="resumen-postre" style="display:none; margin-bottom:1rem;">
@@ -653,9 +670,6 @@
 
     <div id="resumen-equipos"></div>
 
-    <button class="btn btn-outline btn-full" onclick="resetearRespuestas()" style="margin-top:0.5rem; color:var(--danger); border-color:var(--danger)">
-      🗑 Limpiar respuestas (nueva semana)
-    </button>
   </div>
 
 </div>
@@ -1340,6 +1354,111 @@ async function enviarPedido() {
 
 var resumenDiaActivo = 0;
 var resumenRespuestas = [];
+var resumenFiltroEquipo = '__TODOS__';
+
+function escapeCSV(valor) {
+  var s = String(valor == null ? '' : valor);
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
+function descargarCSV(nombreArchivo, contenido) {
+  var blob = new Blob(["\uFEFF" + contenido], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = nombreArchivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function normalizarNombreArchivo(v) {
+  return String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase();
+}
+
+function onChangeResumenFiltroEquipo() {
+  var select = document.getElementById('resumen-filtro-equipo');
+  resumenFiltroEquipo = select ? select.value : '__TODOS__';
+  renderResumenDia();
+}
+
+function actualizarOpcionesFiltroResumen() {
+  var select = document.getElementById('resumen-filtro-equipo');
+  if (!select) return;
+
+  var opciones = ['__TODOS__'].concat(GRUPOS.slice());
+  var extras = {};
+  for (var i = 0; i < resumenRespuestas.length; i++) {
+    var g = String((resumenRespuestas[i] && resumenRespuestas[i].grupo) || '').trim();
+    if (g && opciones.indexOf(g) === -1) extras[g] = true;
+  }
+  Object.keys(extras).sort().forEach(function(g) { opciones.push(g); });
+
+  select.innerHTML = '';
+  for (var j = 0; j < opciones.length; j++) {
+    var val = opciones[j];
+    var opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val === '__TODOS__' ? 'Todos los equipos' : val;
+    select.appendChild(opt);
+  }
+
+  if (opciones.indexOf(resumenFiltroEquipo) === -1) resumenFiltroEquipo = '__TODOS__';
+  select.value = resumenFiltroEquipo;
+}
+
+function exportarResumenCSV() {
+  if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
+  if (!resumenRespuestas || resumenRespuestas.length === 0) { toast('⚠️ No hay pedidos para exportar'); return; }
+
+  var filas = [];
+  for (var i = 0; i < resumenRespuestas.length; i++) {
+    var r = resumenRespuestas[i] || {};
+    var grupo = String(r.grupo || '').trim();
+    if (resumenFiltroEquipo !== '__TODOS__' && grupo !== resumenFiltroEquipo) continue;
+
+    var pedidos = Array.isArray(r.pedidos) ? r.pedidos : [];
+    for (var j = 0; j < pedidos.length; j++) {
+      var p = pedidos[j] || {};
+      filas.push([
+        menuActivo.id,
+        menuActivo.desde,
+        menuActivo.hasta,
+        grupo,
+        r.nombre || '',
+        p.dia || '',
+        p.comida || '',
+        p.bebida || '',
+        r.hora || ''
+      ]);
+    }
+  }
+
+  if (filas.length === 0) { toast('⚠️ No hay pedidos para el filtro seleccionado'); return; }
+
+  var headers = ['menu_id', 'semana_desde', 'semana_hasta', 'equipo', 'nombre', 'dia', 'comida', 'bebida', 'hora'];
+  var csv = headers.map(escapeCSV).join(',') + '\n';
+  csv += filas.map(function(f) { return f.map(escapeCSV).join(','); }).join('\n');
+
+  var filtro = resumenFiltroEquipo === '__TODOS__' ? 'todos' : normalizarNombreArchivo(resumenFiltroEquipo);
+  var archivo = 'resumen-menu-' + normalizarNombreArchivo(menuActivo.desde) + '-a-' + normalizarNombreArchivo(menuActivo.hasta) + '-' + filtro + '.csv';
+  descargarCSV(archivo, csv);
+  toast('✅ CSV exportado');
+}
+
+function cerrarSemana() {
+  if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
+  if (!confirm('Cerrar semana no borra pedidos. Luego podrás cargar una nueva semana. ¿Continuar?')) return;
+  irA('admin');
+  toast('🔒 Semana cerrada. Cargá la nueva semana y guardá para abrir el próximo formulario.');
+}
 
 async function cargarResumen() {
   const menu = await getMenu();
@@ -1365,6 +1484,7 @@ async function cargarResumen() {
 
   document.getElementById('resumen-sin-datos').style.display = 'none';
   document.getElementById('resumen-datos').style.display = 'block';
+  actualizarOpcionesFiltroResumen();
 
   // Tabs de días
   const tabsEl = document.getElementById('resumen-dia-tabs');
@@ -1406,6 +1526,7 @@ function renderResumenDia() {
     if (r.pedidos) {
       const p = r.pedidos.find(p => p.dia === diaName);
       if (p) {
+        if (resumenFiltroEquipo !== '__TODOS__' && r.grupo !== resumenFiltroEquipo) return;
         pedidosDelDia.push({ nombre: r.nombre, grupo: r.grupo, comida: p.comida, bebida: p.bebida });
       }
     }
@@ -1473,18 +1594,14 @@ function renderResumenDia() {
   });
 
   if (!html) {
-    html = '<div class="card" style="text-align:center; color:var(--muted)">No hay pedidos para este día</div>';
+    html = '<div class="card" style="text-align:center; color:var(--muted)">No hay pedidos para este día con el filtro actual</div>';
   }
 
   document.getElementById('resumen-equipos').innerHTML = html;
 }
 
 async function resetearRespuestas() {
-  if (!confirm('¿Limpiar todas las respuestas? Hacé esto solo cuando empiece una nueva semana.')) return;
-  if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
-  await deleteRespuestas(menuActivo.id);
-  await cargarResumen();
-  toast('🗑 Respuestas eliminadas');
+  cerrarSemana();
 }
 
 // ========== INIT ==========
