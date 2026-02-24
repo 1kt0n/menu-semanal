@@ -675,7 +675,8 @@ var GRUPOS = [
   "FORMAL PM",
   "AFORO AM",
   "AFORO PM",
-  "DENUNCIAS"
+  "DENUNCIAS",
+  "SEGURIDAD"
 ];
 var BEBIDAS_FIJAS = ["PEPSI", "PEPSI BLACK", "7UP", "7UP LIGHT", "PASO DE LOS TOROS", "MIRINDA", "JUGO POMELO", "JUGO MANZANA", "AGUA", "AGUA CON GAS"];
 var ADMIN_USUARIO = 'gtwezeiza';
@@ -751,50 +752,120 @@ async function getRespuestas(menuId) {
   return data || [];
 }
 
+function mergePedidos(pedidosBase, pedidosNuevos) {
+  var porDia = {};
+  var i = 0;
+  var prev = null;
+  var nuevo = null;
+
+  pedidosBase = Array.isArray(pedidosBase) ? pedidosBase : [];
+  pedidosNuevos = Array.isArray(pedidosNuevos) ? pedidosNuevos : [];
+
+  for (i = 0; i < pedidosBase.length; i++) {
+    prev = pedidosBase[i];
+    if (prev && prev.dia) porDia[prev.dia] = prev;
+  }
+
+  for (i = 0; i < pedidosNuevos.length; i++) {
+    nuevo = pedidosNuevos[i];
+    if (nuevo && nuevo.dia) porDia[nuevo.dia] = nuevo;
+  }
+
+  var pedidosMerge = [];
+  var diasAgregados = {};
+
+  if (menuActivo && Array.isArray(menuActivo.dias)) {
+    for (i = 0; i < menuActivo.dias.length; i++) {
+      var nombreDia = menuActivo.dias[i].nombre;
+      if (porDia[nombreDia]) {
+        pedidosMerge.push(porDia[nombreDia]);
+        diasAgregados[nombreDia] = true;
+      }
+    }
+  }
+
+  for (var diaNombre in porDia) {
+    if (!Object.prototype.hasOwnProperty.call(porDia, diaNombre)) continue;
+    if (!diasAgregados[diaNombre]) pedidosMerge.push(porDia[diaNombre]);
+  }
+
+  return pedidosMerge;
+}
+
+function pedidosIguales(pedidosA, pedidosB) {
+  var normalA = mergePedidos([], pedidosA).map(function(p) {
+    return { dia: String(p.dia || ''), comida: String(p.comida || ''), bebida: String(p.bebida || '') };
+  });
+  var normalB = mergePedidos([], pedidosB).map(function(p) {
+    return { dia: String(p.dia || ''), comida: String(p.comida || ''), bebida: String(p.bebida || '') };
+  });
+  return JSON.stringify(normalA) === JSON.stringify(normalB);
+}
+
 async function saveRespuesta(respuesta) {
   if (!db) { console.error('Supabase no inicializado'); return false; }
-  const { data: existing } = await db
+  const { data: existentes, error: existentesError } = await db
     .from('respuestas')
-    .select('id,pedidos')
+    .select('id,grupo,pedidos')
     .ilike('nombre', respuesta.nombre)
     .eq('menu_id', respuesta.menu_id)
-    .maybeSingle();
+    .order('id', { ascending: true });
+  if (existentesError) { console.error('Error al consultar respuestas existentes:', existentesError); return false; }
 
-  if (existing) {
-    // Fusionar pedidos para no perder días ya cargados cuando el usuario vuelve más tarde.
-    var pedidosPrevios = Array.isArray(existing.pedidos) ? existing.pedidos : [];
-    var pedidosNuevos = Array.isArray(respuesta.pedidos) ? respuesta.pedidos : [];
-    var pedidosPorNombreDia = {};
+  if (existentes && existentes.length > 0) {
+    var base = existentes[0];
+    var pedidosMergeExistentes = Array.isArray(base.pedidos) ? base.pedidos : [];
 
-    for (var i = 0; i < pedidosPrevios.length; i++) {
-      var prev = pedidosPrevios[i];
-      if (prev && prev.dia) pedidosPorNombreDia[prev.dia] = prev;
-    }
-    for (var j = 0; j < pedidosNuevos.length; j++) {
-      var nuevo = pedidosNuevos[j];
-      if (nuevo && nuevo.dia) pedidosPorNombreDia[nuevo.dia] = nuevo;
+    for (var i = 1; i < existentes.length; i++) {
+      pedidosMergeExistentes = mergePedidos(pedidosMergeExistentes, existentes[i].pedidos);
     }
 
-    var pedidosMerge = [];
-    if (menuActivo && Array.isArray(menuActivo.dias)) {
-      for (var k = 0; k < menuActivo.dias.length; k++) {
-        var nombreDia = menuActivo.dias[k].nombre;
-        if (pedidosPorNombreDia[nombreDia]) pedidosMerge.push(pedidosPorNombreDia[nombreDia]);
-      }
-    } else {
-      for (var diaNombre in pedidosPorNombreDia) {
-        if (Object.prototype.hasOwnProperty.call(pedidosPorNombreDia, diaNombre)) {
-          pedidosMerge.push(pedidosPorNombreDia[diaNombre]);
-        }
+    var pedidosMergeFinal = mergePedidos(pedidosMergeExistentes, respuesta.pedidos);
+    var respuestaMerge = Object.assign({}, respuesta, { pedidos: pedidosMergeFinal });
+    var mismoGrupo = String(base.grupo || '') === String(respuestaMerge.grupo || '');
+    var mismosPedidos = pedidosIguales(base.pedidos, pedidosMergeFinal);
+
+    if (!mismoGrupo || !mismosPedidos) {
+      const { error: updateError } = await db.from('respuestas').update(respuestaMerge).eq('id', base.id);
+      if (updateError) { console.error('Error al actualizar respuesta:', updateError); return false; }
+    }
+
+    if (existentes.length > 1) {
+      var idsDuplicados = existentes.slice(1).map(function(r) { return r.id; }).filter(Boolean);
+      if (idsDuplicados.length > 0) {
+        const { error: deleteDupError } = await db.from('respuestas').delete().in('id', idsDuplicados);
+        if (deleteDupError) { console.error('Error al limpiar respuestas duplicadas:', deleteDupError); }
       }
     }
-
-    var respuestaMerge = Object.assign({}, respuesta, { pedidos: pedidosMerge });
-    const { error } = await db.from('respuestas').update(respuestaMerge).eq('id', existing.id);
-    if (error) { console.error('Error al actualizar respuesta:', error); return false; }
   } else {
-    const { error } = await db.from('respuestas').insert(respuesta);
-    if (error) { console.error('Error al guardar respuesta:', error); return false; }
+    const { error: insertError } = await db.from('respuestas').insert(respuesta);
+    if (insertError) { console.error('Error al guardar respuesta:', insertError); return false; }
+
+    // Mitiga doble click/race conditions: consolida por nombre + menu_id y deja 1 solo registro.
+    const { data: repetidos, error: repetidosError } = await db
+      .from('respuestas')
+      .select('id,grupo,pedidos')
+      .ilike('nombre', respuesta.nombre)
+      .eq('menu_id', respuesta.menu_id)
+      .order('id', { ascending: true });
+
+    if (!repetidosError && repetidos && repetidos.length > 1) {
+      var canonico = repetidos[0];
+      var pedidosConsolidados = Array.isArray(canonico.pedidos) ? canonico.pedidos : [];
+      for (var j = 1; j < repetidos.length; j++) {
+        pedidosConsolidados = mergePedidos(pedidosConsolidados, repetidos[j].pedidos);
+      }
+
+      var respuestaConsolidada = Object.assign({}, respuesta, { pedidos: pedidosConsolidados });
+      const { error: updateCanonicoError } = await db.from('respuestas').update(respuestaConsolidada).eq('id', canonico.id);
+      if (updateCanonicoError) { console.error('Error al consolidar respuestas duplicadas:', updateCanonicoError); return false; }
+
+      var idsSobran = repetidos.slice(1).map(function(r) { return r.id; }).filter(Boolean);
+      if (idsSobran.length > 0) {
+        const { error: deleteSobranError } = await db.from('respuestas').delete().in('id', idsSobran);
+        if (deleteSobranError) { console.error('Error al eliminar respuestas duplicadas:', deleteSobranError); }
+      }
+    }
   }
   return true;
 }
@@ -983,6 +1054,8 @@ function copiarLink() {
 // ========== FORMULARIO ==========
 var grupoSeleccionado = null;
 var pedidosPorDia = {}; // { "Lunes": { comida: "...", bebida: "..." }, ... }
+var envioEnCurso = false;
+var TEXTO_BTN_ENVIAR = 'Confirmar pedido de la semana ✓';
 
 async function cargarFormulario() {
   const menu = await getMenu();
@@ -1095,7 +1168,12 @@ async function cargarFormulario() {
   grupoSeleccionado = null;
   document.getElementById('nombre-persona').value = '';
   document.getElementById('ya-respondio').classList.remove('visible');
-  document.getElementById('btn-enviar').style.display = 'flex';
+  var btnEnviar = document.getElementById('btn-enviar');
+  if (btnEnviar) {
+    btnEnviar.style.display = 'flex';
+    btnEnviar.disabled = false;
+    btnEnviar.textContent = TEXTO_BTN_ENVIAR;
+  }
 }
 
 function resaltarOpcion(grid, btnActivo) {
@@ -1113,44 +1191,15 @@ function toggleOpcion(grid, btn, valorActual, onSelect, onClear) {
   resaltarOpcion(grid, btn);
 }
 
-async function enviarPedidoLegacy() {
-  const nombre = document.getElementById('nombre-persona').value.trim();
-  if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
-  if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
-  if (!menuActivo) { toast('❌ No hay menú activo'); return; }
-
-  // Validar que cada día tenga comida y bebida
-  const pedidos = [];
-  for (const dia of menuActivo.dias) {
-    const p = pedidosPorDia[dia.nombre];
-    if (!p || !p.comida) { toast(`⚠️ Elegí una comida para el ${dia.nombre}`); return; }
-    if (!p.bebida) { toast(`⚠️ Elegí una bebida para el ${dia.nombre}`); return; }
-    pedidos.push({ dia: dia.nombre, comida: p.comida, bebida: p.bebida });
-  }
-
-  const entrada = {
-    nombre,
-    grupo: grupoSeleccionado,
-    pedidos,
-    hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}),
-    menu_id: menuActivo.id
-  };
-
-  const ok = await saveRespuesta(entrada);
-  if (!ok) { toast('❌ Error al enviar el pedido'); return; }
-
-  const resumen = pedidos.map(p => `${p.dia}: ${p.comida} + ${p.bebida}`).join(' | ');
-  document.getElementById('ya-respondio-detalle').textContent =
-    `${grupoSeleccionado} · ${nombre}\n${resumen}`;
-  document.getElementById('ya-respondio').classList.add('visible');
-  document.getElementById('btn-enviar').style.display = 'none';
-  toast('✅ Pedido confirmado');
-}
-
-// ========== RESUMEN ==========
-// Sobrescribe la validación para permitir días sin pedido (franco/vacaciones).
+// ========== FORMULARIO ==========
+// Permite días sin pedido (franco/vacaciones) con validación de pares comida+bebida.
 async function enviarPedido() {
   var nombre = document.getElementById('nombre-persona').value.trim();
+  var btnEnviar = document.getElementById('btn-enviar');
+  var textoBotonOriginal = btnEnviar ? btnEnviar.textContent : TEXTO_BTN_ENVIAR;
+  var envioExitoso = false;
+
+  if (envioEnCurso) { toast('⏳ Tu pedido se está enviando...'); return; }
   if (!grupoSeleccionado) { toast('⚠️ Elegí tu equipo primero'); return; }
   if (!nombre) { toast('⚠️ Ingresá tu nombre'); return; }
   if (!menuActivo) { toast('❌ No hay menú activo'); return; }
@@ -1196,16 +1245,31 @@ async function enviarPedido() {
     menu_id: menuActivo.id
   };
 
-  var ok = await saveRespuesta(entrada);
-  if (!ok) { toast('❌ Error al enviar el pedido'); return; }
+  envioEnCurso = true;
+  if (btnEnviar) {
+    btnEnviar.disabled = true;
+    btnEnviar.textContent = 'Enviando...';
+  }
 
-  var resumen = pedidos.map(function(p) { return p.dia + ': ' + p.comida + ' + ' + p.bebida; }).join('\n');
-  var sinPedido = diasSinPedido.length ? '\nSin pedido: ' + diasSinPedido.join(', ') : '';
-  document.getElementById('ya-respondio-detalle').textContent =
-    grupoSeleccionado + ' · ' + nombre + '\n' + resumen + sinPedido;
-  document.getElementById('ya-respondio').classList.add('visible');
-  document.getElementById('btn-enviar').style.display = 'none';
-  toast('✅ Pedido confirmado');
+  try {
+    var ok = await saveRespuesta(entrada);
+    if (!ok) { toast('❌ Error al enviar el pedido'); return; }
+
+    var resumen = pedidos.map(function(p) { return p.dia + ': ' + p.comida + ' + ' + p.bebida; }).join('\n');
+    var sinPedido = diasSinPedido.length ? '\nSin pedido: ' + diasSinPedido.join(', ') : '';
+    document.getElementById('ya-respondio-detalle').textContent =
+      grupoSeleccionado + ' · ' + nombre + '\n' + resumen + sinPedido;
+    document.getElementById('ya-respondio').classList.add('visible');
+    document.getElementById('btn-enviar').style.display = 'none';
+    toast('✅ Pedido confirmado');
+    envioExitoso = true;
+  } finally {
+    envioEnCurso = false;
+    if (btnEnviar && !envioExitoso) {
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = textoBotonOriginal;
+    }
+  }
 }
 
 var resumenDiaActivo = 0;
