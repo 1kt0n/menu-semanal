@@ -739,13 +739,42 @@ async function saveRespuesta(respuesta) {
   if (!db) { console.error('Supabase no inicializado'); return false; }
   const { data: existing } = await db
     .from('respuestas')
-    .select('id')
+    .select('id,pedidos')
     .ilike('nombre', respuesta.nombre)
     .eq('menu_id', respuesta.menu_id)
     .maybeSingle();
 
   if (existing) {
-    const { error } = await db.from('respuestas').update(respuesta).eq('id', existing.id);
+    // Fusionar pedidos para no perder días ya cargados cuando el usuario vuelve más tarde.
+    var pedidosPrevios = Array.isArray(existing.pedidos) ? existing.pedidos : [];
+    var pedidosNuevos = Array.isArray(respuesta.pedidos) ? respuesta.pedidos : [];
+    var pedidosPorNombreDia = {};
+
+    for (var i = 0; i < pedidosPrevios.length; i++) {
+      var prev = pedidosPrevios[i];
+      if (prev && prev.dia) pedidosPorNombreDia[prev.dia] = prev;
+    }
+    for (var j = 0; j < pedidosNuevos.length; j++) {
+      var nuevo = pedidosNuevos[j];
+      if (nuevo && nuevo.dia) pedidosPorNombreDia[nuevo.dia] = nuevo;
+    }
+
+    var pedidosMerge = [];
+    if (menuActivo && Array.isArray(menuActivo.dias)) {
+      for (var k = 0; k < menuActivo.dias.length; k++) {
+        var nombreDia = menuActivo.dias[k].nombre;
+        if (pedidosPorNombreDia[nombreDia]) pedidosMerge.push(pedidosPorNombreDia[nombreDia]);
+      }
+    } else {
+      for (var diaNombre in pedidosPorNombreDia) {
+        if (Object.prototype.hasOwnProperty.call(pedidosPorNombreDia, diaNombre)) {
+          pedidosMerge.push(pedidosPorNombreDia[diaNombre]);
+        }
+      }
+    }
+
+    var respuestaMerge = Object.assign({}, respuesta, { pedidos: pedidosMerge });
+    const { error } = await db.from('respuestas').update(respuestaMerge).eq('id', existing.id);
     if (error) { console.error('Error al actualizar respuesta:', error); return false; }
   } else {
     const { error } = await db.from('respuestas').insert(respuesta);
@@ -1000,8 +1029,17 @@ async function cargarFormulario() {
       dia.comidas.forEach(c => {
         const btn = document.createElement('button');
         btn.className = 'opcion-btn';
+        btn.type = 'button';
         btn.textContent = c;
-        btn.onclick = () => { pedidosPorDia[dia.nombre].comida = c; resaltarOpcion(gc, btn); };
+        btn.onclick = () => {
+          toggleOpcion(
+            gc,
+            btn,
+            pedidosPorDia[dia.nombre].comida,
+            function() { pedidosPorDia[dia.nombre].comida = c; },
+            function() { pedidosPorDia[dia.nombre].comida = null; }
+          );
+        };
         gc.appendChild(btn);
       });
 
@@ -1009,8 +1047,17 @@ async function cargarFormulario() {
       dia.bebidas.forEach(b => {
         const btn = document.createElement('button');
         btn.className = 'opcion-btn';
+        btn.type = 'button';
         btn.textContent = b;
-        btn.onclick = () => { pedidosPorDia[dia.nombre].bebida = b; resaltarOpcion(gb, btn); };
+        btn.onclick = () => {
+          toggleOpcion(
+            gb,
+            btn,
+            pedidosPorDia[dia.nombre].bebida,
+            function() { pedidosPorDia[dia.nombre].bebida = b; },
+            function() { pedidosPorDia[dia.nombre].bebida = null; }
+          );
+        };
         gb.appendChild(btn);
       });
     }, 0);
@@ -1025,6 +1072,16 @@ async function cargarFormulario() {
 function resaltarOpcion(grid, btnActivo) {
   grid.querySelectorAll('.opcion-btn').forEach(b => b.classList.remove('seleccionado'));
   btnActivo.classList.add('seleccionado');
+}
+
+function toggleOpcion(grid, btn, valorActual, onSelect, onClear) {
+  if (valorActual && btn.textContent === valorActual) {
+    if (typeof onClear === 'function') onClear();
+    btn.classList.remove('seleccionado');
+    return;
+  }
+  if (typeof onSelect === 'function') onSelect();
+  resaltarOpcion(grid, btn);
 }
 
 async function enviarPedidoLegacy() {
