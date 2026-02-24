@@ -1000,6 +1000,9 @@ async function cargarFormulario() {
 
   menu.dias.forEach(dia => {
     pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
+    var comidasDia = (Array.isArray(dia.comidas) ? dia.comidas : []).filter(function(x) { return x && String(x).trim(); });
+    var bebidasDia = (Array.isArray(dia.bebidas) ? dia.bebidas : []).filter(function(x) { return x && String(x).trim(); });
+    var tieneComidas = comidasDia.length > 0;
 
     const section = document.createElement('div');
     section.className = 'form-dia-section';
@@ -1015,22 +1018,28 @@ async function cargarFormulario() {
         ${postreHTML}
       </div>
       <div class="form-dia-body">
-        <div style="margin-bottom:1rem">
-          <div class="card-title" style="margin-bottom:0.6rem">🍛 Comida</div>
-          <div class="opciones-grid" id="form-comida-${dia.nombre}"></div>
-        </div>
-        <div>
-          <div class="card-title" style="margin-bottom:0.6rem">🥤 Bebida</div>
-          <div class="opciones-grid" id="form-bebida-${dia.nombre}"></div>
-        </div>
+        ${tieneComidas ? `
+          <div style="margin-bottom:1rem">
+            <div class="card-title" style="margin-bottom:0.6rem">🍛 Comida</div>
+            <div class="opciones-grid" id="form-comida-${dia.nombre}"></div>
+          </div>
+          <div>
+            <div class="card-title" style="margin-bottom:0.6rem">🥤 Bebida</div>
+            <div class="opciones-grid" id="form-bebida-${dia.nombre}"></div>
+          </div>
+        ` : `
+          <div style="color:var(--muted); font-size:0.86rem;">Sin menu cargado para este dia.</div>
+        `}
       </div>
     `;
     container.appendChild(section);
 
+    if (!tieneComidas) return;
+
     // Render opciones comida
     setTimeout(() => {
       const gc = document.getElementById(`form-comida-${dia.nombre}`);
-      dia.comidas.forEach(c => {
+      comidasDia.forEach(c => {
         const btn = document.createElement('button');
         btn.className = 'opcion-btn';
         btn.type = 'button';
@@ -1048,7 +1057,7 @@ async function cargarFormulario() {
       });
 
       const gb = document.getElementById(`form-bebida-${dia.nombre}`);
-      dia.bebidas.forEach(b => {
+      bebidasDia.forEach(b => {
         const btn = document.createElement('button');
         btn.className = 'opcion-btn';
         btn.type = 'button';
