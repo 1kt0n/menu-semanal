@@ -930,19 +930,24 @@ async function guardarMenu() {
   if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
   if (bebidasFijas.length < 1) { toast('⚠️ Configurá al menos una bebida fija'); return; }
 
-  // Permitir días vacíos (ej. sábado/domingo aún no definidos), pero exigir al menos un día cargado.
-  var diasConComida = menuDias.filter(function(d) {
-    return d.comidas.filter(function(x) { return x.trim(); }).length > 0;
-  }).length;
+  // Normalizar y permitir días vacíos (ej. sábado/domingo aún no definidos).
+  // Se guarda únicamente lo que tenga al menos una comida para evitar días "vacíos" en el formulario.
+  var diasNormalizados = menuDias.map(function(d) {
+    var comidas = (Array.isArray(d.comidas) ? d.comidas : [])
+      .map(function(x) { return (x == null ? '' : String(x)).trim(); })
+      .filter(function(x) { return !!x; });
+    return {
+      nombre: d.nombre,
+      comidas: comidas,
+      bebidas: [].concat(bebidasFijas),
+      postre: (d.postre == null ? '' : String(d.postre)).trim()
+    };
+  });
+
+  var diasConComida = diasNormalizados.filter(function(d) { return d.comidas.length > 0; }).length;
   if (diasConComida < 1) { toast('⚠️ Cargá al menos una comida en algún día'); return; }
 
-  // Limpiar items vacíos
-  const dias = menuDias.map(d => ({
-    nombre: d.nombre,
-    comidas: d.comidas.filter(x => x.trim()),
-    bebidas: [...bebidasFijas],
-    postre: d.postre.trim()
-  }));
+  var dias = diasNormalizados.filter(function(d) { return d.comidas.length > 0; });
 
   const menu = { desde, hasta, dias, creado: Date.now() };
   const saved = await saveMenu(menu);
