@@ -549,7 +549,7 @@
     <div class="semana-input">
       <div>
         <label>Desde</label>
-        <input type="text" id="semana-desde" placeholder="Ej: 24 de febrero">
+        <input type="text" id="semana-desde" placeholder="Ej: 24-2 o 2026-02-24" oninput="renderAdminTabs()">
       </div>
       <div>
         <label>Hasta</label>
@@ -696,6 +696,69 @@ try {
 
 function getBebidasFijas() {
   return (BEBIDAS_FIJAS || []).map(b => String(b || '').trim()).filter(Boolean);
+}
+
+function normalizarTextoFecha(v) {
+  return String(v || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function parseFechaBaseSemana(texto) {
+  var raw = String(texto || '').trim();
+  if (!raw) return null;
+
+  var ymd = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (ymd) {
+    var anioYmd = Number(ymd[1]);
+    var mesYmd = Number(ymd[2]);
+    var diaYmd = Number(ymd[3]);
+    var fechaYmd = new Date(anioYmd, mesYmd - 1, diaYmd, 12, 0, 0, 0);
+    if (fechaYmd.getFullYear() === anioYmd && (fechaYmd.getMonth() + 1) === mesYmd && fechaYmd.getDate() === diaYmd) return fechaYmd;
+  }
+
+  var dmy = raw.match(/^(\d{1,2})[-\/](\d{1,2})(?:[-\/](\d{2,4}))?$/);
+  if (dmy) {
+    var diaDmy = Number(dmy[1]);
+    var mesDmy = Number(dmy[2]);
+    var anioDmy = dmy[3] ? Number(dmy[3]) : new Date().getFullYear();
+    if (anioDmy < 100) anioDmy += 2000;
+    var fechaDmy = new Date(anioDmy, mesDmy - 1, diaDmy, 12, 0, 0, 0);
+    if (fechaDmy.getFullYear() === anioDmy && (fechaDmy.getMonth() + 1) === mesDmy && fechaDmy.getDate() === diaDmy) return fechaDmy;
+  }
+
+  var meses = {
+    enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+    julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+  };
+  var norm = normalizarTextoFecha(raw);
+  var matchMes = norm.match(/^(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?$/);
+  if (matchMes) {
+    var diaMes = Number(matchMes[1]);
+    var mesNombre = matchMes[2];
+    var nroMes = meses[mesNombre];
+    var anioMes = matchMes[3] ? Number(matchMes[3]) : new Date().getFullYear();
+    if (nroMes) {
+      var fechaMes = new Date(anioMes, nroMes - 1, diaMes, 12, 0, 0, 0);
+      if (fechaMes.getFullYear() === anioMes && (fechaMes.getMonth() + 1) === nroMes && fechaMes.getDate() === diaMes) return fechaMes;
+    }
+  }
+
+  return null;
+}
+
+function getEtiquetaDia(nombreDia, fechaDesdeTexto) {
+  var idx = DIAS.indexOf(nombreDia);
+  if (idx < 0) return nombreDia;
+
+  var base = parseFechaBaseSemana(fechaDesdeTexto);
+  if (!base) return nombreDia;
+
+  var fechaDia = new Date(base.getTime());
+  fechaDia.setDate(fechaDia.getDate() + idx);
+  return nombreDia + ' ' + fechaDia.getDate() + '-' + (fechaDia.getMonth() + 1);
 }
 
 // ========== SUPABASE HELPERS ==========
@@ -932,14 +995,16 @@ var adminDiaActivo = 0;
 function renderAdminTabs() {
   const tabsEl = document.getElementById('admin-dia-tabs');
   const contEl = document.getElementById('admin-dia-contenidos');
+  const desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
   tabsEl.innerHTML = '';
   contEl.innerHTML = '';
 
   DIAS.forEach((dia, i) => {
+    var etiquetaDia = getEtiquetaDia(dia, desdeSemana);
     // Tab
     const tab = document.createElement('button');
     tab.className = 'dia-tab' + (i === adminDiaActivo ? ' activo' : '');
-    tab.textContent = dia;
+    tab.textContent = etiquetaDia;
     tab.onclick = () => { adminDiaActivo = i; renderAdminTabs(); };
     tabsEl.appendChild(tab);
 
@@ -948,7 +1013,7 @@ function renderAdminTabs() {
     div.className = 'dia-contenido' + (i === adminDiaActivo ? ' activo' : '');
     div.innerHTML = `
       <div class="card">
-        <div class="card-title">🍛 Comidas — ${dia} <span style="color:var(--muted);font-weight:400">${menuDias[i].comidas.length > 0 ? '(' + menuDias[i].comidas.length + ')' : ''}</span></div>
+        <div class="card-title">🍛 Comidas — ${etiquetaDia} <span style="color:var(--muted);font-weight:400">${menuDias[i].comidas.length > 0 ? '(' + menuDias[i].comidas.length + ')' : ''}</span></div>
         <div class="items-grid" id="admin-comidas-${i}"></div>
         <button class="btn-agregar" onclick="adminAgregarItem(${i}, 'comidas')">+ Agregar comida</button>
       </div>
@@ -960,7 +1025,7 @@ function renderAdminTabs() {
         <p style="font-size:0.75rem; color:var(--muted); margin-top:0.6rem">Estas bebidas se aplican automáticamente a todos los días del menú.</p>
       </div>
       <div class="card">
-        <div class="card-title">🍮 Postre — ${dia}</div>
+        <div class="card-title">🍮 Postre — ${etiquetaDia}</div>
         <input type="text" value="${menuDias[i].postre}" placeholder="Ej: Flan con dulce de leche"
           oninput="menuDias[${i}].postre = this.value">
         <p style="font-size:0.75rem; color:var(--muted); margin-top:-0.4rem">Se muestra como información, no se elige.</p>
@@ -1088,6 +1153,7 @@ async function cargarFormulario() {
   container.innerHTML = '';
 
   menu.dias.forEach(dia => {
+    var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde);
     pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
     var comidasDia = (Array.isArray(dia.comidas) ? dia.comidas : []).filter(function(x) { return x && String(x).trim(); });
     var bebidasDia = (Array.isArray(dia.bebidas) ? dia.bebidas : []).filter(function(x) { return x && String(x).trim(); });
@@ -1103,7 +1169,7 @@ async function cargarFormulario() {
 
     section.innerHTML = `
       <div class="form-dia-header">
-        <span>📅 ${dia.nombre}</span>
+        <span>📅 ${etiquetaDia}</span>
         ${postreHTML}
       </div>
       <div class="form-dia-body">
@@ -1306,7 +1372,7 @@ async function cargarResumen() {
   menu.dias.forEach((dia, i) => {
     const tab = document.createElement('button');
     tab.className = 'dia-tab' + (i === resumenDiaActivo ? ' activo' : '');
-    tab.textContent = dia.nombre;
+    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde);
     tab.onclick = () => { resumenDiaActivo = i; renderResumenDia(); };
     tabsEl.appendChild(tab);
   });
