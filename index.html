@@ -715,14 +715,30 @@ async function getMenu() {
 
 async function saveMenu(menu) {
   if (!db) { console.error('Supabase no inicializado'); return null; }
-  const { data, error } = await db
+
+  // Si es la misma semana, actualizar el menú actual para conservar el menu_id
+  // y no separar respuestas en registros distintos.
+  if (menuActivo && menuActivo.id && menuActivo.desde === menu.desde && menuActivo.hasta === menu.hasta) {
+    const { data: updated, error: updateError } = await db
+      .from('menu')
+      .update(menu)
+      .eq('id', menuActivo.id)
+      .select()
+      .single();
+    if (updateError) { console.error('Error al actualizar menú:', updateError); return null; }
+    menuActivo = updated;
+    return updated;
+  }
+
+  // Si cambió la semana, crear un nuevo menú.
+  const { data: inserted, error: insertError } = await db
     .from('menu')
     .insert(menu)
     .select()
     .single();
-  if (error) { console.error('Error al guardar menú:', error); return null; }
-  menuActivo = data;
-  return data;
+  if (insertError) { console.error('Error al guardar menú:', insertError); return null; }
+  menuActivo = inserted;
+  return inserted;
 }
 
 async function getRespuestas(menuId) {
