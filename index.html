@@ -549,11 +549,11 @@
     <div class="semana-input">
       <div>
         <label>Desde</label>
-        <input type="text" id="semana-desde" placeholder="Ej: 24-2 o 2026-02-24" oninput="renderAdminTabs()">
+        <input type="date" id="semana-desde" oninput="onDesdeInput()">
       </div>
       <div>
         <label>Hasta</label>
-        <input type="text" id="semana-hasta" placeholder="Ej: 28 de febrero">
+        <input type="date" id="semana-hasta">
       </div>
     </div>
     <div>
@@ -801,6 +801,19 @@ function parseDateTimeLocalToISO(valor) {
   var d = new Date(raw);
   if (isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+function toDateValue(texto) {
+  var d = parseFechaBaseSemana(String(texto || '').trim());
+  if (!d) return '';
+  var pad = function(n) { return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+function formatarFechaCorta(texto) {
+  var d = parseFechaBaseSemana(String(texto || '').trim());
+  if (!d) return texto;
+  return d.getDate() + '/' + (d.getMonth() + 1);
 }
 
 function calcularFechaLimiteSugerida(desdeTexto) {
@@ -1185,17 +1198,21 @@ function toast(msg) {
 var menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: getBebidasFijas(), postre: '' }));
 var adminDiaActivo = 0;
 
-function renderAdminTabs() {
-  const tabsEl = document.getElementById('admin-dia-tabs');
-  const contEl = document.getElementById('admin-dia-contenidos');
-  const desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
-
-  // Auto-sugerir Viernes al mediodía si el campo fecha_limite está vacío
+function onDesdeInput() {
+  renderAdminTabs();
+  // Auto-sugerir Viernes al mediodía solo cuando el admin escribe (no al cargar menú)
+  var desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
   var campoFechaLimite = document.getElementById('semana-fecha-limite');
   if (campoFechaLimite && !campoFechaLimite.value && desdeSemana) {
     var sugerida = calcularFechaLimiteSugerida(desdeSemana);
     if (sugerida) campoFechaLimite.value = toDateTimeLocalValue(sugerida);
   }
+}
+
+function renderAdminTabs() {
+  const tabsEl = document.getElementById('admin-dia-tabs');
+  const contEl = document.getElementById('admin-dia-contenidos');
+  const desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
 
   tabsEl.innerHTML = '';
   contEl.innerHTML = '';
@@ -1372,7 +1389,7 @@ async function cargarFormulario() {
   document.getElementById('form-cerrado').style.display = 'none';
   document.getElementById('form-contenido').style.display = 'block';
   document.getElementById('form-semana-titulo').textContent =
-    `Semana del ${menu.desde} al ${menu.hasta}`;
+    `Semana del ${formatarFechaCorta(menu.desde)} al ${formatarFechaCorta(menu.hasta)}`;
 
   var avisoDl = document.getElementById('form-deadline-aviso');
   if (avisoDl) {
@@ -1740,7 +1757,7 @@ async function cargarResumen() {
     if (!isNaN(limiteFecha.getTime())) limiteTxt = ' · Límite: ' + limiteFecha.toLocaleString('es-AR');
   }
   document.getElementById('resumen-semana-titulo').textContent =
-    `Semana del ${menu.desde} al ${menu.hasta} · Estado: ${estado}${limiteTxt}`;
+    `Semana del ${formatarFechaCorta(menu.desde)} al ${formatarFechaCorta(menu.hasta)} · Estado: ${estado}${limiteTxt}`;
   document.getElementById('stat-total').textContent = resumenRespuestas.length;
 
   if (resumenRespuestas.length === 0) {
@@ -1886,8 +1903,8 @@ async function cargarMenuEnAdmin() {
         postre: d.postre || ''
       };
     });
-    document.getElementById('semana-desde').value = menu.desde;
-    document.getElementById('semana-hasta').value = menu.hasta;
+    document.getElementById('semana-desde').value = toDateValue(menu.desde);
+    document.getElementById('semana-hasta').value = toDateValue(menu.hasta);
     document.getElementById('semana-fecha-limite').value = toDateTimeLocalValue(menu.fecha_limite);
     const link = window.location.href.split('?')[0] + '?vista=form';
     document.getElementById('link-texto').textContent = link;
