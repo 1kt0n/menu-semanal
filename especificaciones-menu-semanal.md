@@ -199,6 +199,13 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
    - bloqueo de formulario/envio al vencer fecha.
 7. Fallback de cierre:
    - si `menu.fecha_limite/cerrado` no esta disponible por REST, persiste en `menu.dias._meta_cierre`.
+8. Aviso de deadline en formulario usuario:
+   - banner amarillo visible mientras el formulario esta abierto con la fecha/hora de cierre.
+   - mensaje de bloqueo claro al vencer (con fecha exacta).
+9. Auto-calculo de fecha limite en Admin:
+   - al ingresar `Desde`, se auto-sugiere el Viernes anterior al mediodia (patron operativo habitual).
+   - boton `Recalcular` para forzar sugerencia si el campo ya tiene valor.
+   - admin puede sobreescribir manualmente en cualquier momento.
 
 ---
 
@@ -210,6 +217,8 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 | `saveMenu(menu)` | Inserta/actualiza menu activo |
 | `saveRespuesta(respuesta)` | Upsert logico por nombre/menu, merge de pedidos y limpieza de duplicados |
 | `guardarMenu()` | Valida, ordena dias, guarda menu y fecha limite |
+| `calcularFechaLimiteSugerida(desdeTexto)` | Calcula el Viernes anterior al mediodia dado un texto de fecha |
+| `sugerirFechaLimite()` | Rellena el campo fecha_limite con la sugerencia (llamada por boton Recalcular) |
 | `cargarFormulario()` | Render formulario y bloquea si semana cerrada/vencida |
 | `enviarPedido()` | Envio validado + proteccion anti doble click |
 | `cargarResumen()` | Render resumen semanal, estado y tabs por dia |
@@ -240,3 +249,9 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 ---
 
 *Actualizado: 25 febrero 2026 — Estado alineado con produccion en GitHub Pages + Supabase*
+
+### Flujo operativo real (referencia para fecha limite)
+- El admin recibe el menu del comedor los jueves/viernes para la semana siguiente.
+- Los bloques semanales son Sabado→Viernes o Lunes→Viernes segun la semana.
+- Patron habitual: pedidos cierran el **Viernes anterior al inicio del bloque a las 12:00**.
+- Ejemplo: menu desde Sab 28/2 → fecha limite sugerida = Vie 27/2 12:00.
