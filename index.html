@@ -556,7 +556,13 @@
         <input type="date" id="semana-hasta">
       </div>
     </div>
-    <div>
+    <div style="margin-top:0.5rem">
+      <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+        <input type="checkbox" id="toggle-fecha-limite" onchange="toggleFechaLimite()">
+        Limitar tiempo de pedidos
+      </label>
+    </div>
+    <div id="bloque-fecha-limite" style="display:none; margin-top:0.5rem">
       <label>Fecha límite para tomar pedidos</label>
       <input type="datetime-local" id="semana-fecha-limite" style="margin-bottom:0">
       <p style="font-size:0.75rem; color:var(--muted); margin-top:0.45rem">Se sugiere el Viernes previo al mediodía automáticamente. <button type="button" onclick="sugerirFechaLimite()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:0.75rem;padding:0;text-decoration:underline;">↺ Recalcular</button></p>
@@ -1295,13 +1301,15 @@ function adminEliminarItem(diaIdx, tipo, itemIdx) {
 async function guardarMenu() {
   const desde = document.getElementById('semana-desde').value.trim();
   const hasta = document.getElementById('semana-hasta').value.trim();
-  const fechaLimiteInput = document.getElementById('semana-fecha-limite').value;
+  var toggleLimite = document.getElementById('toggle-fecha-limite');
+  var limitarTiempo = toggleLimite ? toggleLimite.checked : false;
+  const fechaLimiteInput = limitarTiempo ? document.getElementById('semana-fecha-limite').value : '';
   const bebidasFijas = getBebidasFijas();
 
   if (!desde || !hasta) { toast('⚠️ Ingresá las fechas de la semana'); return; }
   if (bebidasFijas.length < 1) { toast('⚠️ Configurá al menos una bebida fija'); return; }
-  var fechaLimiteISO = parseDateTimeLocalToISO(fechaLimiteInput);
-  if (fechaLimiteInput && !fechaLimiteISO) { toast('⚠️ Fecha límite inválida'); return; }
+  var fechaLimiteISO = limitarTiempo ? parseDateTimeLocalToISO(fechaLimiteInput) : null;
+  if (limitarTiempo && fechaLimiteInput && !fechaLimiteISO) { toast('⚠️ Fecha límite inválida'); return; }
 
   // Normalizar y permitir días vacíos (ej. sábado/domingo aún no definidos).
   // Se guarda únicamente lo que tenga al menos una comida para evitar días "vacíos" en el formulario.
@@ -1361,6 +1369,21 @@ function sugerirFechaLimite() {
   } else {
     toast('⚠️ Ingresá primero la fecha de inicio de la semana');
   }
+}
+
+function toggleFechaLimite() {
+  var activo = document.getElementById('toggle-fecha-limite').checked;
+  var bloque = document.getElementById('bloque-fecha-limite');
+  var campo = document.getElementById('semana-fecha-limite');
+  if (!bloque || !campo) return;
+  bloque.style.display = activo ? 'block' : 'none';
+  if (activo && !campo.value) {
+    // Auto-sugerir al activar si hay fecha Desde
+    var desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
+    var sugerida = calcularFechaLimiteSugerida(desdeSemana);
+    if (sugerida) campo.value = toDateTimeLocalValue(sugerida);
+  }
+  if (!activo) campo.value = '';
 }
 
 // ========== FORMULARIO ==========
@@ -1905,11 +1928,17 @@ async function cargarMenuEnAdmin() {
     });
     document.getElementById('semana-desde').value = toDateValue(menu.desde);
     document.getElementById('semana-hasta').value = toDateValue(menu.hasta);
+    // Restaurar estado del toggle de fecha límite
+    var tieneLimite = !!menu.fecha_limite;
+    document.getElementById('toggle-fecha-limite').checked = tieneLimite;
+    document.getElementById('bloque-fecha-limite').style.display = tieneLimite ? 'block' : 'none';
     document.getElementById('semana-fecha-limite').value = toDateTimeLocalValue(menu.fecha_limite);
     const link = window.location.href.split('?')[0] + '?vista=form';
     document.getElementById('link-texto').textContent = link;
     document.getElementById('link-generado').style.display = 'block';
   } else {
+    document.getElementById('toggle-fecha-limite').checked = false;
+    document.getElementById('bloque-fecha-limite').style.display = 'none';
     document.getElementById('semana-fecha-limite').value = '';
   }
   renderAdminTabs();
