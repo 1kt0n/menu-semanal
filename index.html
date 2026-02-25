@@ -724,7 +724,7 @@
 
   <div id="resumen-sin-datos" class="empty" style="display:none">
     <div class="empty-icon">📭</div>
-    <p>Todavía no hay respuestas.<br>Compartí el formulario con tu equipo.</p>
+    <p>No hay un menú configurado todavía.<br>Creá uno desde Admin para ver el resumen.</p>
   </div>
 
   <div id="resumen-datos" style="display:none">
@@ -745,6 +745,7 @@
       </div>
     </div>
 
+    <div style="margin-bottom:0.4rem; font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Semana actual</div>
     <div class="dia-tabs" id="resumen-dia-tabs"></div>
 
     <div id="resumen-postre" style="display:none; margin-bottom:1rem;">
@@ -757,7 +758,43 @@
       </div>
     </div>
 
+    <div id="resumen-actual-sin-datos" class="empty" style="display:none; margin-bottom:1rem;">
+      <div class="empty-icon">📭</div>
+      <p>No hay respuestas en la semana actual.</p>
+    </div>
+
     <div id="resumen-equipos"></div>
+
+    <div id="resumen-anterior-wrap" style="margin-top:1.4rem;">
+      <div style="margin-bottom:0.4rem; font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Semana anterior</div>
+      <p class="desc" id="resumen-anterior-semana-titulo" style="margin-bottom:0.8rem">—</p>
+
+      <div id="resumen-anterior-no-disponible" class="empty" style="display:none; margin-bottom:1rem;">
+        <div class="empty-icon">🗂️</div>
+        <p>No hay semana anterior disponible.</p>
+      </div>
+
+      <div id="resumen-anterior-datos" style="display:none">
+        <div class="dia-tabs" id="resumen-anterior-dia-tabs"></div>
+
+        <div id="resumen-anterior-postre" style="display:none; margin-bottom:1rem;">
+          <div class="card" style="display:flex; align-items:center; gap:0.75rem; padding:1rem 1.4rem; border-left:3px solid #d97706;">
+            <span style="font-size:1.4rem">🍮</span>
+            <div>
+              <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Postre del día</div>
+              <div style="font-weight:600; font-size:0.95rem;" id="resumen-anterior-postre-texto"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="resumen-anterior-sin-datos" class="empty" style="display:none; margin-bottom:1rem;">
+          <div class="empty-icon">📭</div>
+          <p>No hay respuestas en la semana anterior.</p>
+        </div>
+
+        <div id="resumen-anterior-equipos"></div>
+      </div>
+    </div>
 
   </div>
 
@@ -967,7 +1004,7 @@ function descripcionCierreMenu(menu) {
   if (menu.fecha_limite) {
     var limite = new Date(menu.fecha_limite);
     if (!isNaN(limite.getTime()) && Date.now() > limite.getTime()) {
-      return 'La fecha límite de pedidos ya venció (' + limite.toLocaleString('es-AR') + ').\nSi te olvidaste de cargar tu pedido comunicate con tu Supervisor y/o referente.';
+      return 'La fecha límite de pedidos ya venció (' + limite.toLocaleString('es-AR') + ').\n\n Si te olvidaste de cargar tu pedido comunicate con tu Supervisor y/o referente.';
     }
   }
   return '';
@@ -1058,6 +1095,27 @@ async function getMenu() {
   menuActivo = data;
   await aplicarMetaCierreFallback(menuActivo);
   return menuActivo;
+}
+
+async function getMenusResumen() {
+  if (!db) return { actual: null, anterior: null };
+  const { data, error } = await db
+    .from('menu')
+    .select('*')
+    .order('creado', { ascending: false })
+    .limit(2);
+  if (error) {
+    console.error('Error al obtener menús para resumen:', error);
+    return { actual: null, anterior: null };
+  }
+
+  var actual = data && data[0] ? data[0] : null;
+  var anterior = data && data[1] ? data[1] : null;
+  if (actual) await aplicarMetaCierreFallback(actual);
+  if (anterior) await aplicarMetaCierreFallback(anterior);
+
+  menuActivo = actual;
+  return { actual: actual, anterior: anterior };
 }
 
 async function saveMenu(menu) {
@@ -1704,8 +1762,12 @@ async function enviarPedido() {
   }
 }
 
-var resumenDiaActivo = 0;
-var resumenRespuestas = [];
+var resumenMenuActual = null;
+var resumenMenuAnterior = null;
+var resumenRespuestasActual = [];
+var resumenRespuestasAnterior = [];
+var resumenDiaActivoActual = 0;
+var resumenDiaActivoAnterior = 0;
 var resumenFiltroEquipo = '__TODOS__';
 
 function escapeCSV(valor) {
@@ -1738,7 +1800,8 @@ function normalizarNombreArchivo(v) {
 function onChangeResumenFiltroEquipo() {
   var select = document.getElementById('resumen-filtro-equipo');
   resumenFiltroEquipo = select ? select.value : '__TODOS__';
-  renderResumenDia();
+  renderResumenSeccionActual();
+  renderResumenSeccionAnterior();
 }
 
 function actualizarOpcionesFiltroResumen() {
@@ -1747,8 +1810,9 @@ function actualizarOpcionesFiltroResumen() {
 
   var opciones = ['__TODOS__'].concat(GRUPOS.slice());
   var extras = {};
-  for (var i = 0; i < resumenRespuestas.length; i++) {
-    var g = String((resumenRespuestas[i] && resumenRespuestas[i].grupo) || '').trim();
+  var todas = [].concat(resumenRespuestasActual || [], resumenRespuestasAnterior || []);
+  for (var i = 0; i < todas.length; i++) {
+    var g = String((todas[i] && todas[i].grupo) || '').trim();
     if (g && opciones.indexOf(g) === -1) extras[g] = true;
   }
   Object.keys(extras).sort().forEach(function(g) { opciones.push(g); });
@@ -1766,23 +1830,48 @@ function actualizarOpcionesFiltroResumen() {
   select.value = resumenFiltroEquipo;
 }
 
-function exportarResumenCSV() {
-  if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
-  if (!resumenRespuestas || resumenRespuestas.length === 0) { toast('⚠️ No hay pedidos para exportar'); return; }
+function getTextoSemanaResumen(menu) {
+  if (!menu) return '—';
+  var estado = menuEstaCerrado(menu) ? 'Cerrado' : 'Abierto';
+  var limiteTxt = '';
+  if (menu.fecha_limite) {
+    var limiteFecha = new Date(menu.fecha_limite);
+    if (!isNaN(limiteFecha.getTime())) limiteTxt = ' · Límite: ' + limiteFecha.toLocaleString('es-AR');
+  }
+  return `Semana del ${formatarFechaCorta(menu.desde)} al ${formatarFechaCorta(menu.hasta)} · Estado: ${estado}${limiteTxt}`;
+}
+
+function preguntarSemanaParaExportarCSV() {
+  if (!resumenMenuActual) { toast('⚠️ No hay menú activo'); return null; }
+  if (!resumenMenuAnterior) return 'actual';
+
+  var opcion = prompt('Exportar CSV de qué semana? Escribí: actual o anterior', 'actual');
+  if (opcion === null) return null;
+  opcion = String(opcion || '').trim().toLowerCase();
+  if (!opcion || opcion === 'actual') return 'actual';
+  if (opcion === 'anterior') return 'anterior';
+  toast('⚠️ Opción inválida. Usá \"actual\" o \"anterior\".');
+  return null;
+}
+
+function exportarResumenCSVDe(menuObj, respuestas, filtroEquipo) {
+  if (!menuObj) { toast('⚠️ No hay semana para exportar'); return; }
+  respuestas = Array.isArray(respuestas) ? respuestas : [];
+  if (respuestas.length === 0) { toast('⚠️ No hay pedidos para exportar'); return; }
 
   var filas = [];
-  for (var i = 0; i < resumenRespuestas.length; i++) {
-    var r = resumenRespuestas[i] || {};
+  for (var i = 0; i < respuestas.length; i++) {
+    var r = respuestas[i] || {};
     var grupo = String(r.grupo || '').trim();
-    if (resumenFiltroEquipo !== '__TODOS__' && grupo !== resumenFiltroEquipo) continue;
+    if (filtroEquipo !== '__TODOS__' && grupo !== filtroEquipo) continue;
 
     var pedidos = Array.isArray(r.pedidos) ? r.pedidos : [];
     for (var j = 0; j < pedidos.length; j++) {
       var p = pedidos[j] || {};
       filas.push([
-        menuActivo.id,
-        menuActivo.desde,
-        menuActivo.hasta,
+        menuObj.id,
+        menuObj.desde,
+        menuObj.hasta,
         grupo,
         r.nombre || '',
         p.dia || '',
@@ -1799,10 +1888,20 @@ function exportarResumenCSV() {
   var csv = headers.map(escapeCSV).join(',') + '\n';
   csv += filas.map(function(f) { return f.map(escapeCSV).join(','); }).join('\n');
 
-  var filtro = resumenFiltroEquipo === '__TODOS__' ? 'todos' : normalizarNombreArchivo(resumenFiltroEquipo);
-  var archivo = 'resumen-menu-' + normalizarNombreArchivo(menuActivo.desde) + '-a-' + normalizarNombreArchivo(menuActivo.hasta) + '-' + filtro + '.csv';
+  var filtro = filtroEquipo === '__TODOS__' ? 'todos' : normalizarNombreArchivo(filtroEquipo);
+  var archivo = 'resumen-menu-' + normalizarNombreArchivo(menuObj.desde) + '-a-' + normalizarNombreArchivo(menuObj.hasta) + '-' + filtro + '.csv';
   descargarCSV(archivo, csv);
   toast('✅ CSV exportado');
+}
+
+function exportarResumenCSV() {
+  var semana = preguntarSemanaParaExportarCSV();
+  if (!semana) return;
+  if (semana === 'anterior') {
+    exportarResumenCSVDe(resumenMenuAnterior, resumenRespuestasAnterior, resumenFiltroEquipo);
+    return;
+  }
+  exportarResumenCSVDe(resumenMenuActual, resumenRespuestasActual, resumenFiltroEquipo);
 }
 
 async function cerrarSemana() {
@@ -1832,11 +1931,177 @@ async function cerrarSemana() {
   toast('🔒 Semana cerrada. Ahora podés exportar CSV y cargar la próxima.');
 }
 
-async function cargarResumen() {
-  const menu = await getMenu();
-  resumenRespuestas = menu ? await getRespuestas(menu.id) : [];
+function renderBloqueResumen(opts) {
+  var menu = opts.menu;
+  var respuestas = Array.isArray(opts.respuestas) ? opts.respuestas : [];
+  var tabsEl = document.getElementById(opts.tabsId);
+  var postreEl = document.getElementById(opts.postreId);
+  var postreTextoEl = document.getElementById(opts.postreTextoId);
+  var equiposEl = document.getElementById(opts.equiposId);
+  var sinDatosEl = document.getElementById(opts.sinDatosId);
+  if (!tabsEl || !postreEl || !postreTextoEl || !equiposEl) return 0;
 
-  if (!menu) {
+  if (!menu || !Array.isArray(menu.dias) || menu.dias.length === 0) {
+    tabsEl.innerHTML = '';
+    postreEl.style.display = 'none';
+    equiposEl.innerHTML = '';
+    if (sinDatosEl) sinDatosEl.style.display = 'block';
+    return 0;
+  }
+
+  var diaActivo = opts.diaActivo;
+  if (diaActivo < 0 || diaActivo >= menu.dias.length) diaActivo = 0;
+
+  tabsEl.innerHTML = '';
+  menu.dias.forEach(function(dia, i) {
+    const tab = document.createElement('button');
+    tab.className = 'dia-tab' + (i === diaActivo ? ' activo' : '');
+    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde, i);
+    tab.onclick = function() { opts.onDiaChange(i); };
+    tabsEl.appendChild(tab);
+  });
+
+  const dia = menu.dias[diaActivo];
+  const diaName = dia.nombre;
+
+  document.querySelectorAll('#' + opts.tabsId + ' .dia-tab').forEach(function(t, i) {
+    t.classList.toggle('activo', i === diaActivo);
+  });
+
+  if (dia.postre) {
+    postreEl.style.display = 'block';
+    postreTextoEl.textContent = dia.postre;
+  } else {
+    postreEl.style.display = 'none';
+  }
+
+  if (sinDatosEl) sinDatosEl.style.display = respuestas.length === 0 ? 'block' : 'none';
+  if (respuestas.length === 0) {
+    equiposEl.innerHTML = '';
+    return diaActivo;
+  }
+
+  const pedidosDelDia = [];
+  respuestas.forEach(function(r) {
+    if (!r || !r.pedidos) return;
+    const p = r.pedidos.find(function(px) { return px.dia === diaName; });
+    if (!p) return;
+    if (resumenFiltroEquipo !== '__TODOS__' && r.grupo !== resumenFiltroEquipo) return;
+    pedidosDelDia.push({ nombre: r.nombre, grupo: r.grupo, comida: p.comida, bebida: p.bebida });
+  });
+
+  const porEquipo = {};
+  GRUPOS.forEach(function(g) { porEquipo[g] = []; });
+  pedidosDelDia.forEach(function(p) {
+    const g = p.grupo || 'Sin grupo';
+    if (!porEquipo[g]) porEquipo[g] = [];
+    porEquipo[g].push(p);
+  });
+
+  const gruposOrdenados = [].concat(GRUPOS);
+  Object.keys(porEquipo).forEach(function(g) {
+    if (gruposOrdenados.indexOf(g) === -1) gruposOrdenados.push(g);
+  });
+
+  let html = '';
+  gruposOrdenados.forEach(function(grupo) {
+    const personas = porEquipo[grupo];
+    if (!personas || personas.length === 0) return;
+
+    const contComida = {};
+    personas.forEach(function(p) { contComida[p.comida] = (contComida[p.comida] || 0) + 1; });
+    const listaComida = Object.entries(contComida).sort(function(a,b) { return b[1]-a[1]; })
+      .map(function(e) {
+        return '<span style=\"background:var(--yellow-light); color:#92400e; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #ffe580\">' + e[1] + 'x ' + e[0] + '</span>';
+      }).join(' ');
+
+    const contBebida = {};
+    personas.forEach(function(p) { contBebida[p.bebida] = (contBebida[p.bebida] || 0) + 1; });
+    const listaBebida = Object.entries(contBebida).sort(function(a,b) { return b[1]-a[1]; })
+      .map(function(e) {
+        return '<span style=\"background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #fca5a5\">' + e[1] + 'x ' + e[0] + '</span>';
+      }).join(' ');
+
+    const listaPersonas = personas.map(function(r) {
+      return '<div class=\"persona-row\"><div class=\"persona-avatar\">' + r.nombre.charAt(0).toUpperCase() + '</div><div style=\"flex:1\"><div class=\"persona-nombre\">' + r.nombre + '</div></div><div class=\"persona-detalle\">' + r.comida + '<br>' + r.bebida + '</div></div>';
+    }).join('');
+
+    html +=
+      '<div class=\"card\" style=\"margin-bottom:1rem\">' +
+        '<div style=\"display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem\">' +
+          '<h3 style=\"margin:0; font-size:1rem\">' + grupo + '</h3>' +
+          '<span style=\"background:var(--yellow); color:#2d2d2d; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:600\">' + personas.length + ' persona' + (personas.length > 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div style=\"margin-bottom:0.5rem\"><div style=\"font-size:0.7rem; color:var(--muted); margin-bottom:4px\">🍛 Comidas</div><div style=\"display:flex; flex-wrap:wrap; gap:2px\">' + listaComida + '</div></div>' +
+        '<div style=\"margin-bottom:0.75rem\"><div style=\"font-size:0.7rem; color:var(--muted); margin-bottom:4px\">🥤 Bebidas</div><div style=\"display:flex; flex-wrap:wrap; gap:2px\">' + listaBebida + '</div></div>' +
+        '<div>' + listaPersonas + '</div>' +
+      '</div>';
+  });
+
+  if (!html) {
+    html = '<div class="card" style="text-align:center; color:var(--muted)">No hay pedidos para este día con el filtro actual</div>';
+  }
+
+  equiposEl.innerHTML = html;
+  return diaActivo;
+}
+
+function renderResumenSeccionActual() {
+  resumenDiaActivoActual = renderBloqueResumen({
+    menu: resumenMenuActual,
+    respuestas: resumenRespuestasActual,
+    diaActivo: resumenDiaActivoActual,
+    tabsId: 'resumen-dia-tabs',
+    postreId: 'resumen-postre',
+    postreTextoId: 'resumen-postre-texto',
+    equiposId: 'resumen-equipos',
+    sinDatosId: 'resumen-actual-sin-datos',
+    onDiaChange: function(i) {
+      resumenDiaActivoActual = i;
+      renderResumenSeccionActual();
+    }
+  });
+}
+
+function renderResumenSeccionAnterior() {
+  var noDispEl = document.getElementById('resumen-anterior-no-disponible');
+  var datosEl = document.getElementById('resumen-anterior-datos');
+  var tituloEl = document.getElementById('resumen-anterior-semana-titulo');
+  if (!noDispEl || !datosEl || !tituloEl) return;
+
+  if (!resumenMenuAnterior) {
+    tituloEl.textContent = '—';
+    noDispEl.style.display = 'block';
+    datosEl.style.display = 'none';
+    return;
+  }
+
+  tituloEl.textContent = getTextoSemanaResumen(resumenMenuAnterior);
+  noDispEl.style.display = 'none';
+  datosEl.style.display = 'block';
+
+  resumenDiaActivoAnterior = renderBloqueResumen({
+    menu: resumenMenuAnterior,
+    respuestas: resumenRespuestasAnterior,
+    diaActivo: resumenDiaActivoAnterior,
+    tabsId: 'resumen-anterior-dia-tabs',
+    postreId: 'resumen-anterior-postre',
+    postreTextoId: 'resumen-anterior-postre-texto',
+    equiposId: 'resumen-anterior-equipos',
+    sinDatosId: 'resumen-anterior-sin-datos',
+    onDiaChange: function(i) {
+      resumenDiaActivoAnterior = i;
+      renderResumenSeccionAnterior();
+    }
+  });
+}
+
+async function cargarResumen() {
+  const menus = await getMenusResumen();
+  resumenMenuActual = menus.actual;
+  resumenMenuAnterior = menus.anterior;
+
+  if (!resumenMenuActual) {
     document.getElementById('resumen-semana-titulo').textContent = 'No hay menú configurado';
     document.getElementById('stat-total').textContent = '—';
     document.getElementById('resumen-sin-datos').style.display = 'block';
@@ -1844,139 +2109,23 @@ async function cargarResumen() {
     return;
   }
 
-  var estado = menuEstaCerrado(menu) ? 'Cerrado' : 'Abierto';
-  var limiteTxt = '';
-  if (menu.fecha_limite) {
-    var limiteFecha = new Date(menu.fecha_limite);
-    if (!isNaN(limiteFecha.getTime())) limiteTxt = ' · Límite: ' + limiteFecha.toLocaleString('es-AR');
-  }
-  document.getElementById('resumen-semana-titulo').textContent =
-    `Semana del ${formatarFechaCorta(menu.desde)} al ${formatarFechaCorta(menu.hasta)} · Estado: ${estado}${limiteTxt}`;
-  document.getElementById('stat-total').textContent = resumenRespuestas.length;
+  var respuestasActualP = getRespuestas(resumenMenuActual.id);
+  var respuestasAnteriorP = resumenMenuAnterior ? getRespuestas(resumenMenuAnterior.id) : Promise.resolve([]);
+  var ambas = await Promise.all([respuestasActualP, respuestasAnteriorP]);
+  resumenRespuestasActual = ambas[0] || [];
+  resumenRespuestasAnterior = ambas[1] || [];
 
-  if (resumenRespuestas.length === 0) {
-    document.getElementById('resumen-sin-datos').style.display = 'block';
-    document.getElementById('resumen-datos').style.display = 'none';
-    return;
-  }
-
+  document.getElementById('resumen-semana-titulo').textContent = getTextoSemanaResumen(resumenMenuActual);
+  document.getElementById('stat-total').textContent = resumenRespuestasActual.length;
   document.getElementById('resumen-sin-datos').style.display = 'none';
   document.getElementById('resumen-datos').style.display = 'block';
+
+  menuActivo = resumenMenuActual;
   actualizarOpcionesFiltroResumen();
-
-  // Tabs de días
-  const tabsEl = document.getElementById('resumen-dia-tabs');
-  tabsEl.innerHTML = '';
-  menu.dias.forEach((dia, i) => {
-    const tab = document.createElement('button');
-    tab.className = 'dia-tab' + (i === resumenDiaActivo ? ' activo' : '');
-    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde, i);
-    tab.onclick = () => { resumenDiaActivo = i; renderResumenDia(); };
-    tabsEl.appendChild(tab);
-  });
-
-  renderResumenDia();
+  renderResumenSeccionActual();
+  renderResumenSeccionAnterior();
 }
 
-function renderResumenDia() {
-  const menu = menuActivo;
-  if (!menu || !menu.dias[resumenDiaActivo]) return;
-
-  const dia = menu.dias[resumenDiaActivo];
-  const diaName = dia.nombre;
-
-  // Actualizar tabs activo
-  document.querySelectorAll('#resumen-dia-tabs .dia-tab').forEach((t, i) => {
-    t.classList.toggle('activo', i === resumenDiaActivo);
-  });
-
-  // Postre
-  if (dia.postre) {
-    document.getElementById('resumen-postre').style.display = 'block';
-    document.getElementById('resumen-postre-texto').textContent = dia.postre;
-  } else {
-    document.getElementById('resumen-postre').style.display = 'none';
-  }
-
-  // Extraer pedidos del día seleccionado
-  const pedidosDelDia = [];
-  resumenRespuestas.forEach(r => {
-    if (r.pedidos) {
-      const p = r.pedidos.find(p => p.dia === diaName);
-      if (p) {
-        if (resumenFiltroEquipo !== '__TODOS__' && r.grupo !== resumenFiltroEquipo) return;
-        pedidosDelDia.push({ nombre: r.nombre, grupo: r.grupo, comida: p.comida, bebida: p.bebida });
-      }
-    }
-  });
-
-  // Agrupar por equipo
-  const porEquipo = {};
-  GRUPOS.forEach(g => porEquipo[g] = []);
-  pedidosDelDia.forEach(p => {
-    const g = p.grupo || 'Sin grupo';
-    if (!porEquipo[g]) porEquipo[g] = [];
-    porEquipo[g].push(p);
-  });
-
-  // Mantener el orden de GRUPOS y agregar al final equipos no previstos.
-  const gruposOrdenados = [...GRUPOS];
-  Object.keys(porEquipo).forEach(g => {
-    if (gruposOrdenados.indexOf(g) === -1) gruposOrdenados.push(g);
-  });
-
-  // Renderizar cards por equipo
-  let html = '';
-  gruposOrdenados.forEach(grupo => {
-    const personas = porEquipo[grupo];
-    if (!personas || personas.length === 0) return;
-
-    // Subtotales comida
-    const contComida = {};
-    personas.forEach(p => { contComida[p.comida] = (contComida[p.comida] || 0) + 1; });
-    const listaComida = Object.entries(contComida).sort((a,b) => b[1]-a[1])
-      .map(([nombre, cant]) => `<span style="background:var(--yellow-light); color:#92400e; padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #ffe580">${cant}x ${nombre}</span>`).join(' ');
-
-    // Subtotales bebida
-    const contBebida = {};
-    personas.forEach(p => { contBebida[p.bebida] = (contBebida[p.bebida] || 0) + 1; });
-    const listaBebida = Object.entries(contBebida).sort((a,b) => b[1]-a[1])
-      .map(([nombre, cant]) => `<span style="background:var(--primary-light); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:0.75rem; margin:2px; border:1px solid #fca5a5">${cant}x ${nombre}</span>`).join(' ');
-
-    // Lista de personas
-    const listaPersonas = personas.map(r => `
-      <div class="persona-row">
-        <div class="persona-avatar">${r.nombre.charAt(0).toUpperCase()}</div>
-        <div style="flex:1">
-          <div class="persona-nombre">${r.nombre}</div>
-        </div>
-        <div class="persona-detalle">${r.comida}<br>${r.bebida}</div>
-      </div>`).join('');
-
-    html += `
-      <div class="card" style="margin-bottom:1rem">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem">
-          <h3 style="margin:0; font-size:1rem">${grupo}</h3>
-          <span style="background:var(--yellow); color:#2d2d2d; padding:2px 10px; border-radius:10px; font-size:0.75rem; font-weight:600">${personas.length} persona${personas.length > 1 ? 's' : ''}</span>
-        </div>
-        <div style="margin-bottom:0.5rem">
-          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:4px">🍛 Comidas</div>
-          <div style="display:flex; flex-wrap:wrap; gap:2px">${listaComida}</div>
-        </div>
-        <div style="margin-bottom:0.75rem">
-          <div style="font-size:0.7rem; color:var(--muted); margin-bottom:4px">🥤 Bebidas</div>
-          <div style="display:flex; flex-wrap:wrap; gap:2px">${listaBebida}</div>
-        </div>
-        <div>${listaPersonas}</div>
-      </div>`;
-  });
-
-  if (!html) {
-    html = '<div class="card" style="text-align:center; color:var(--muted)">No hay pedidos para este día con el filtro actual</div>';
-  }
-
-  document.getElementById('resumen-equipos').innerHTML = html;
-}
 
 async function resetearRespuestas() {
   await cerrarSemana();
