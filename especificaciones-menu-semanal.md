@@ -140,7 +140,10 @@ var BEBIDAS_FIJAS = ['PEPSI', 'PEPSI BLACK', '7UP', '7UP LIGHT', 'PASO DE LOS TO
 
 ### 5.4 Resumen (`#vista-resumen`)
 - Estadisticas y agrupacion por equipo.
-- Filtro por equipo.
+- Filtro por equipo (compartido para ambas semanas).
+- Selector de vista por tabs:
+  - `Semana actual`
+  - `Semana anterior` (solo si existe)
 - Exportacion `CSV` semanal con filtro aplicado.
 - Boton `Cerrar semana (sin borrar)`:
   - bloquea nuevos pedidos,
@@ -207,6 +210,10 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
    - al ingresar `Desde`, se auto-sugiere el Viernes anterior al mediodia (patron operativo habitual).
    - boton `Recalcular` para forzar sugerencia si el campo ya tiene valor.
    - admin puede sobreescribir manualmente en cualquier momento.
+10. Resumen con semana anterior:
+   - toma el **2do menu mas nuevo** por `creado desc`,
+   - muestra una sola semana a la vez via tabs (`actual/anterior`),
+   - mantiene filtro de equipo unico para ambas.
 
 ---
 
@@ -215,6 +222,7 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 | Funcion | Descripcion |
 |---------|-------------|
 | `getMenu()` | Obtiene menu mas reciente y aplica meta de cierre (nativa o fallback) |
+| `getMenusResumen()` | Obtiene menu actual + semana anterior (2 mas recientes) |
 | `saveMenu(menu)` | Inserta/actualiza menu activo |
 | `saveRespuesta(respuesta)` | Upsert logico por nombre/menu, merge de pedidos y limpieza de duplicados |
 | `guardarMenu()` | Valida, ordena dias, guarda menu y fecha limite |
@@ -222,8 +230,9 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 | `sugerirFechaLimite()` | Rellena el campo fecha_limite con la sugerencia (llamada por boton Recalcular) |
 | `cargarFormulario()` | Render formulario y bloquea si semana cerrada/vencida |
 | `enviarPedido()` | Envio validado + proteccion anti doble click |
-| `cargarResumen()` | Render resumen semanal, estado y tabs por dia |
-| `renderResumenDia()` | Agrupa por equipo y aplica filtro |
+| `cargarResumen()` | Render resumen semanal (actual + anterior), estado y filtros |
+| `renderBloqueResumen()` | Render parametrizable de una semana |
+| `mostrarSemanaResumen()` | Alterna vista entre semana actual y semana anterior |
 | `exportarResumenCSV()` | Descarga CSV semanal con columnas de detalle |
 | `cerrarSemana()` | Cierra semana sin borrar pedidos |
 
@@ -249,7 +258,7 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 
 ---
 
-*Actualizado: 25 febrero 2026 — Incluye toggle de deadline y fechas `type=date` en Admin, con estado alineado a produccion*
+*Actualizado: 25 febrero 2026 — Incluye toggle de deadline, resumen con tab de semana anterior y fechas `type=date` en Admin*
 
 ### Flujo operativo real (referencia para fecha limite)
 - El admin recibe el menu del comedor los jueves/viernes para la semana siguiente.

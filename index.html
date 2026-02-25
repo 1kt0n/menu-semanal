@@ -745,28 +745,33 @@
       </div>
     </div>
 
-    <div style="margin-bottom:0.4rem; font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Semana actual</div>
-    <div class="dia-tabs" id="resumen-dia-tabs"></div>
+    <div class="dia-tabs" id="resumen-semana-tabs" style="margin-bottom:0.9rem;">
+      <button class="dia-tab activo" id="btn-semana-actual" onclick="mostrarSemanaResumen('actual')">Semana actual</button>
+      <button class="dia-tab" id="btn-semana-anterior" onclick="mostrarSemanaResumen('anterior')">Semana anterior</button>
+    </div>
 
-    <div id="resumen-postre" style="display:none; margin-bottom:1rem;">
-      <div class="card" style="display:flex; align-items:center; gap:0.75rem; padding:1rem 1.4rem; border-left:3px solid #d97706;">
-        <span style="font-size:1.4rem">🍮</span>
-        <div>
-          <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Postre del día</div>
-          <div style="font-weight:600; font-size:0.95rem;" id="resumen-postre-texto"></div>
+    <div id="resumen-actual-wrap">
+      <div class="dia-tabs" id="resumen-dia-tabs"></div>
+
+      <div id="resumen-postre" style="display:none; margin-bottom:1rem;">
+        <div class="card" style="display:flex; align-items:center; gap:0.75rem; padding:1rem 1.4rem; border-left:3px solid #d97706;">
+          <span style="font-size:1.4rem">🍮</span>
+          <div>
+            <div style="font-size:0.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Postre del día</div>
+            <div style="font-weight:600; font-size:0.95rem;" id="resumen-postre-texto"></div>
+          </div>
         </div>
       </div>
+
+      <div id="resumen-actual-sin-datos" class="empty" style="display:none; margin-bottom:1rem;">
+        <div class="empty-icon">📭</div>
+        <p>No hay respuestas en la semana actual.</p>
+      </div>
+
+      <div id="resumen-equipos"></div>
     </div>
 
-    <div id="resumen-actual-sin-datos" class="empty" style="display:none; margin-bottom:1rem;">
-      <div class="empty-icon">📭</div>
-      <p>No hay respuestas en la semana actual.</p>
-    </div>
-
-    <div id="resumen-equipos"></div>
-
-    <div id="resumen-anterior-wrap" style="margin-top:1.4rem;">
-      <div style="margin-bottom:0.4rem; font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;">Semana anterior</div>
+    <div id="resumen-anterior-wrap" style="display:none;">
       <p class="desc" id="resumen-anterior-semana-titulo" style="margin-bottom:0.8rem">—</p>
 
       <div id="resumen-anterior-no-disponible" class="empty" style="display:none; margin-bottom:1rem;">
@@ -1769,6 +1774,7 @@ var resumenRespuestasAnterior = [];
 var resumenDiaActivoActual = 0;
 var resumenDiaActivoAnterior = 0;
 var resumenFiltroEquipo = '__TODOS__';
+var resumenSemanaVista = 'actual';
 
 function escapeCSV(valor) {
   var s = String(valor == null ? '' : valor);
@@ -1795,6 +1801,38 @@ function normalizarNombreArchivo(v) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .toLowerCase();
+}
+
+function mostrarSemanaResumen(vista) {
+  var destino = vista === 'anterior' ? 'anterior' : 'actual';
+  if (destino === 'anterior' && !resumenMenuAnterior) {
+    toast('ℹ️ No hay semana anterior disponible');
+    destino = 'actual';
+  }
+  resumenSemanaVista = destino;
+  actualizarTabsSemanaResumen();
+}
+
+function actualizarTabsSemanaResumen() {
+  var btnActual = document.getElementById('btn-semana-actual');
+  var btnAnterior = document.getElementById('btn-semana-anterior');
+  var actualWrap = document.getElementById('resumen-actual-wrap');
+  var anteriorWrap = document.getElementById('resumen-anterior-wrap');
+  var hayAnterior = !!resumenMenuAnterior;
+
+  if (!hayAnterior && resumenSemanaVista === 'anterior') resumenSemanaVista = 'actual';
+
+  if (btnActual) btnActual.classList.toggle('activo', resumenSemanaVista === 'actual');
+  if (btnAnterior) {
+    btnAnterior.classList.toggle('activo', resumenSemanaVista === 'anterior');
+    btnAnterior.disabled = !hayAnterior;
+    btnAnterior.style.opacity = hayAnterior ? '1' : '0.6';
+    btnAnterior.style.cursor = hayAnterior ? 'pointer' : 'not-allowed';
+    btnAnterior.title = hayAnterior ? '' : 'No hay semana anterior disponible';
+  }
+
+  if (actualWrap) actualWrap.style.display = resumenSemanaVista === 'actual' ? 'block' : 'none';
+  if (anteriorWrap) anteriorWrap.style.display = resumenSemanaVista === 'anterior' ? 'block' : 'none';
 }
 
 function onChangeResumenFiltroEquipo() {
@@ -2124,6 +2162,7 @@ async function cargarResumen() {
   actualizarOpcionesFiltroResumen();
   renderResumenSeccionActual();
   renderResumenSeccionAnterior();
+  actualizarTabsSemanaResumen();
 }
 
 
