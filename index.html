@@ -830,13 +830,23 @@ function getDiasOrdenadosPorDesde(diasNormalizados, desdeTexto) {
 }
 
 var soporteCierreMenu = null;
-async function detectarSoporteCierreMenu() {
-  if (soporteCierreMenu !== null) return soporteCierreMenu;
+async function detectarSoporteCierreMenu(forzar) {
+  if (forzar === true) soporteCierreMenu = null;
+  if (soporteCierreMenu === true) return true;
   if (!db) { soporteCierreMenu = false; return soporteCierreMenu; }
   const { error } = await db.from('menu').select('id,fecha_limite,cerrado').limit(1);
-  soporteCierreMenu = !error;
-  if (error) console.warn('Sin columnas de cierre en menu. Ejecutá el SQL de actualización.', error);
-  return soporteCierreMenu;
+  if (!error) {
+    soporteCierreMenu = true;
+    return true;
+  }
+  if (error && error.code === '42703') {
+    soporteCierreMenu = false;
+    console.warn('Sin columnas de cierre en menu. Ejecutá el SQL de actualización.', error);
+    return false;
+  }
+  // No cachear falso por errores transitorios/red.
+  console.warn('No se pudo validar soporte de cierre en este intento.', error);
+  return false;
 }
 
 function menuEstaCerrado(menu) {
@@ -1205,7 +1215,7 @@ async function guardarMenu() {
   dias = getDiasOrdenadosPorDesde(dias, desde);
 
   var menu = { desde: desde, hasta: hasta, dias: dias, creado: Date.now() };
-  var tieneCierre = await detectarSoporteCierreMenu();
+  var tieneCierre = await detectarSoporteCierreMenu(true);
   if (!tieneCierre && fechaLimiteInput) {
     toast('⚠️ Falta SQL de cierre para guardar fecha límite.');
     return;
@@ -1562,7 +1572,7 @@ function exportarResumenCSV() {
 
 async function cerrarSemana() {
   if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
-  var tieneCierre = await detectarSoporteCierreMenu();
+  var tieneCierre = await detectarSoporteCierreMenu(true);
   if (!tieneCierre) {
     toast('⚠️ Falta SQL de cierre. Pedime el script y te lo paso.');
     return;
