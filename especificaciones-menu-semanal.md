@@ -121,7 +121,8 @@ var BEBIDAS_FIJAS = ['PEPSI', 'PEPSI BLACK', '7UP', '7UP LIGHT', 'PASO DE LOS TO
 - Al autenticar muestra tabs de Admin y Resumen.
 
 ### 5.2 Admin (`#vista-admin`)
-- Carga semana: `Desde`, `Hasta` y **Fecha limite para tomar pedidos** (`datetime-local`).
+- Carga semana con inputs `type=date`: `Desde` y `Hasta`.
+- Tiene toggle `Limitar tiempo de pedidos`; al activarlo habilita **Fecha limite para tomar pedidos** (`datetime-local`).
 - Carga comidas/postre por dia (bebidas fijas globales).
 - Guarda menu y genera link `?vista=form`.
 - Ordena dias segun fecha `Desde` para soportar bloques no estandar (ej: sabado-viernes).
@@ -248,10 +249,11 @@ Fallback de cierre (solo cuando no hay columnas nativas visibles por REST):
 
 ---
 
-*Actualizado: 25 febrero 2026 — Estado alineado con produccion en GitHub Pages + Supabase*
+*Actualizado: 25 febrero 2026 — Incluye toggle de deadline y fechas `type=date` en Admin, con estado alineado a produccion*
 
 ### Flujo operativo real (referencia para fecha limite)
 - El admin recibe el menu del comedor los jueves/viernes para la semana siguiente.
 - Los bloques semanales son Sabado→Viernes o Lunes→Viernes segun la semana.
 - Patron habitual: pedidos cierran el **Viernes anterior al inicio del bloque a las 12:00**.
 - Ejemplo: menu desde Sab 28/2 → fecha limite sugerida = Vie 27/2 12:00.
+

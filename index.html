@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -967,7 +967,7 @@ function descripcionCierreMenu(menu) {
   if (menu.fecha_limite) {
     var limite = new Date(menu.fecha_limite);
     if (!isNaN(limite.getTime()) && Date.now() > limite.getTime()) {
-      return 'La fecha límite de pedidos ya venció (' + limite.toLocaleString('es-AR') + ').';
+      return 'La fecha límite de pedidos ya venció (' + limite.toLocaleString('es-AR') + ').\nSi te olvidaste de cargar tu pedido comunicate con tu Supervisor y/o referente.';
     }
   }
   return '';
@@ -2037,3 +2037,4 @@ init();
 </script>
 </body>
 </html>
+
