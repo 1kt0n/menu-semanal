@@ -870,6 +870,67 @@ function descripcionCierreMenu(menu) {
   return '';
 }
 
+function getMenuMetaUsuario(menuId) {
+  return '__menu_meta__' + String(menuId || '');
+}
+
+async function getMenuMetaFallback(menuId) {
+  if (!db || !menuId) return null;
+  const usuarioMeta = getMenuMetaUsuario(menuId);
+  const { data, error } = await db
+    .from('admins')
+    .select('id,clave')
+    .eq('usuario', usuarioMeta)
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('Error al obtener meta de cierre (fallback):', error); return null; }
+  if (!data || !data.clave) return null;
+  try {
+    var meta = JSON.parse(String(data.clave));
+    return {
+      id: data.id,
+      fecha_limite: meta && meta.fecha_limite ? String(meta.fecha_limite) : null,
+      cerrado: !!(meta && meta.cerrado)
+    };
+  } catch (e) {
+    console.warn('Meta de cierre inválida (fallback).', e);
+    return null;
+  }
+}
+
+async function saveMenuMetaFallback(menuId, fechaLimiteISO, cerrado) {
+  if (!db || !menuId) return false;
+  const usuarioMeta = getMenuMetaUsuario(menuId);
+  const payload = JSON.stringify({ fecha_limite: fechaLimiteISO || null, cerrado: !!cerrado });
+  const existente = await getMenuMetaFallback(menuId);
+
+  if (existente && existente.id) {
+    const { error: updateError } = await db.from('admins').update({ clave: payload }).eq('id', existente.id);
+    if (updateError) { console.error('Error al actualizar meta de cierre (fallback):', updateError); return false; }
+    return true;
+  }
+
+  const { error: insertError } = await db.from('admins').insert({ usuario: usuarioMeta, clave: payload });
+  if (insertError) { console.error('Error al guardar meta de cierre (fallback):', insertError); return false; }
+  return true;
+}
+
+async function aplicarMetaCierreFallback(menu) {
+  if (!menu) return menu;
+  var tieneSoporteColumnas = await detectarSoporteCierreMenu();
+  if (tieneSoporteColumnas) return menu;
+  var meta = await getMenuMetaFallback(menu.id);
+  if (meta) {
+    menu.fecha_limite = meta.fecha_limite;
+    menu.cerrado = meta.cerrado;
+  } else {
+    menu.fecha_limite = null;
+    menu.cerrado = false;
+  }
+  return menu;
+}
+
 // ========== SUPABASE HELPERS ==========
 var menuActivo = null;
 
@@ -883,7 +944,8 @@ async function getMenu() {
     .maybeSingle();
   if (error) { console.error('Error al obtener menú:', error); return null; }
   menuActivo = data;
-  return data;
+  await aplicarMetaCierreFallback(menuActivo);
+  return menuActivo;
 }
 
 async function saveMenu(menu) {
@@ -1216,16 +1278,20 @@ async function guardarMenu() {
 
   var menu = { desde: desde, hasta: hasta, dias: dias, creado: Date.now() };
   var tieneCierre = await detectarSoporteCierreMenu(true);
-  if (!tieneCierre && fechaLimiteInput) {
-    toast('⚠️ Falta SQL de cierre para guardar fecha límite.');
-    return;
-  }
   if (tieneCierre) {
     menu.fecha_limite = fechaLimiteISO;
     menu.cerrado = false;
   }
   const saved = await saveMenu(menu);
   if (!saved) { toast('❌ Error al guardar el menú'); return; }
+
+  if (!tieneCierre) {
+    var okMeta = await saveMenuMetaFallback(saved.id, fechaLimiteISO, false);
+    if (!okMeta) { toast('⚠️ No se pudo guardar fecha límite (fallback)'); }
+    saved.fecha_limite = fechaLimiteISO;
+    saved.cerrado = false;
+    menuActivo = saved;
+  }
 
   const link = window.location.href.split('?')[0] + '?vista=form';
   document.getElementById('link-texto').textContent = link;
@@ -1573,11 +1639,16 @@ function exportarResumenCSV() {
 async function cerrarSemana() {
   if (!menuActivo) { toast('⚠️ No hay menú activo'); return; }
   var tieneCierre = await detectarSoporteCierreMenu(true);
+  if (!confirm('Cerrar semana bloqueará nuevos pedidos, sin borrar el historial. ¿Continuar?')) return;
+
   if (!tieneCierre) {
-    toast('⚠️ Falta SQL de cierre. Pedime el script y te lo paso.');
+    var okFallback = await saveMenuMetaFallback(menuActivo.id, menuActivo.fecha_limite || null, true);
+    if (!okFallback) { toast('❌ No se pudo cerrar la semana (fallback)'); return; }
+    menuActivo.cerrado = true;
+    await cargarResumen();
+    toast('🔒 Semana cerrada (modo fallback).');
     return;
   }
-  if (!confirm('Cerrar semana bloqueará nuevos pedidos, sin borrar el historial. ¿Continuar?')) return;
 
   const { data, error } = await db
     .from('menu')
