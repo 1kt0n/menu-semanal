@@ -870,49 +870,63 @@ function descripcionCierreMenu(menu) {
   return '';
 }
 
-function getMenuMetaUsuario(menuId) {
-  return '__menu_meta__' + String(menuId || '');
+function leerMetaCierreDesdeDias(dias) {
+  if (!Array.isArray(dias)) return null;
+  for (var i = 0; i < dias.length; i++) {
+    var d = dias[i];
+    if (!d || typeof d !== 'object') continue;
+    var meta = d._meta_cierre;
+    if (!meta || typeof meta !== 'object') continue;
+    return {
+      fecha_limite: meta.fecha_limite ? String(meta.fecha_limite) : null,
+      cerrado: !!meta.cerrado
+    };
+  }
+  return null;
 }
 
-async function getMenuMetaFallback(menuId) {
-  if (!db || !menuId) return null;
-  const usuarioMeta = getMenuMetaUsuario(menuId);
-  const { data, error } = await db
-    .from('admins')
-    .select('id,clave')
-    .eq('usuario', usuarioMeta)
-    .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) { console.error('Error al obtener meta de cierre (fallback):', error); return null; }
-  if (!data || !data.clave) return null;
-  try {
-    var meta = JSON.parse(String(data.clave));
-    return {
-      id: data.id,
-      fecha_limite: meta && meta.fecha_limite ? String(meta.fecha_limite) : null,
-      cerrado: !!(meta && meta.cerrado)
-    };
-  } catch (e) {
-    console.warn('Meta de cierre inválida (fallback).', e);
-    return null;
-  }
+function inyectarMetaCierreEnDias(dias, fechaLimiteISO, cerrado) {
+  var base = Array.isArray(dias) ? dias : [];
+  if (base.length === 0) return [];
+
+  var copia = base.map(function(d) {
+    if (!d || typeof d !== 'object') return d;
+    var out = Object.assign({}, d);
+    if (Object.prototype.hasOwnProperty.call(out, '_meta_cierre')) delete out._meta_cierre;
+    return out;
+  });
+
+  if (!copia[0] || typeof copia[0] !== 'object') copia[0] = { nombre: 'Lunes', comidas: [], bebidas: [], postre: '' };
+  copia[0]._meta_cierre = {
+    fecha_limite: fechaLimiteISO || null,
+    cerrado: !!cerrado
+  };
+  return copia;
 }
 
 async function saveMenuMetaFallback(menuId, fechaLimiteISO, cerrado) {
   if (!db || !menuId) return false;
-  const usuarioMeta = getMenuMetaUsuario(menuId);
-  const payload = JSON.stringify({ fecha_limite: fechaLimiteISO || null, cerrado: !!cerrado });
-  const existente = await getMenuMetaFallback(menuId);
+  const { data: actual, error: readError } = await db
+    .from('menu')
+    .select('id,dias')
+    .eq('id', menuId)
+    .maybeSingle();
+  if (readError || !actual) { console.error('Error al leer menu para meta fallback:', readError); return false; }
 
-  if (existente && existente.id) {
-    const { error: updateError } = await db.from('admins').update({ clave: payload }).eq('id', existente.id);
-    if (updateError) { console.error('Error al actualizar meta de cierre (fallback):', updateError); return false; }
-    return true;
+  var diasActualizados = inyectarMetaCierreEnDias(actual.dias, fechaLimiteISO, cerrado);
+  const { data: updated, error: updateError } = await db
+    .from('menu')
+    .update({ dias: diasActualizados })
+    .eq('id', menuId)
+    .select()
+    .single();
+  if (updateError) { console.error('Error al guardar meta de cierre en dias (fallback):', updateError); return false; }
+
+  if (menuActivo && menuActivo.id === menuId) {
+    menuActivo = updated;
+    menuActivo.fecha_limite = fechaLimiteISO || null;
+    menuActivo.cerrado = !!cerrado;
   }
-
-  const { error: insertError } = await db.from('admins').insert({ usuario: usuarioMeta, clave: payload });
-  if (insertError) { console.error('Error al guardar meta de cierre (fallback):', insertError); return false; }
   return true;
 }
 
@@ -920,14 +934,9 @@ async function aplicarMetaCierreFallback(menu) {
   if (!menu) return menu;
   var tieneSoporteColumnas = await detectarSoporteCierreMenu();
   if (tieneSoporteColumnas) return menu;
-  var meta = await getMenuMetaFallback(menu.id);
-  if (meta) {
-    menu.fecha_limite = meta.fecha_limite;
-    menu.cerrado = meta.cerrado;
-  } else {
-    menu.fecha_limite = null;
-    menu.cerrado = false;
-  }
+  var meta = leerMetaCierreDesdeDias(menu.dias);
+  menu.fecha_limite = meta ? meta.fecha_limite : null;
+  menu.cerrado = meta ? !!meta.cerrado : false;
   return menu;
 }
 
@@ -1281,13 +1290,13 @@ async function guardarMenu() {
   if (tieneCierre) {
     menu.fecha_limite = fechaLimiteISO;
     menu.cerrado = false;
+  } else {
+    menu.dias = inyectarMetaCierreEnDias(menu.dias, fechaLimiteISO, false);
   }
   const saved = await saveMenu(menu);
   if (!saved) { toast('❌ Error al guardar el menú'); return; }
 
   if (!tieneCierre) {
-    var okMeta = await saveMenuMetaFallback(saved.id, fechaLimiteISO, false);
-    if (!okMeta) { toast('⚠️ No se pudo guardar fecha límite (fallback)'); }
     saved.fecha_limite = fechaLimiteISO;
     saved.cerrado = false;
     menuActivo = saved;
