@@ -559,7 +559,7 @@
     <div>
       <label>Fecha límite para tomar pedidos</label>
       <input type="datetime-local" id="semana-fecha-limite" style="margin-bottom:0">
-      <p style="font-size:0.75rem; color:var(--muted); margin-top:0.45rem">Al llegar esta fecha, el formulario se cierra automáticamente.</p>
+      <p style="font-size:0.75rem; color:var(--muted); margin-top:0.45rem">Se sugiere el Viernes previo al mediodía automáticamente. <button type="button" onclick="sugerirFechaLimite()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:0.75rem;padding:0;text-decoration:underline;">↺ Recalcular</button></p>
     </div>
   </div>
 
@@ -599,6 +599,8 @@
       <div style="font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.25rem">Menú de la semana</div>
       <h2 id="form-semana-titulo">—</h2>
     </div>
+
+    <div id="form-deadline-aviso" style="display:none; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:0.6rem 1rem; margin-bottom:1rem; font-size:0.85rem; color:#92400e;"></div>
 
     <div class="card">
       <div class="card-title">🏢 ¿A qué equipo pertenecés?</div>
@@ -799,6 +801,17 @@ function parseDateTimeLocalToISO(valor) {
   var d = new Date(raw);
   if (isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+function calcularFechaLimiteSugerida(desdeTexto) {
+  var base = parseFechaBaseSemana(desdeTexto);
+  if (!base) return null;
+  var dow = base.getDay(); // 0=Dom, 1=Lun, ..., 5=Vie, 6=Sab
+  var diasAViernes = ((dow - 5 + 7) % 7) || 7; // 0 si Vie → va 7 días atrás
+  var viernes = new Date(base.getTime());
+  viernes.setDate(viernes.getDate() - diasAViernes);
+  viernes.setHours(12, 0, 0, 0);
+  return viernes;
 }
 
 function getDayNameFromDate(fecha) {
@@ -1176,6 +1189,14 @@ function renderAdminTabs() {
   const tabsEl = document.getElementById('admin-dia-tabs');
   const contEl = document.getElementById('admin-dia-contenidos');
   const desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
+
+  // Auto-sugerir Viernes al mediodía si el campo fecha_limite está vacío
+  var campoFechaLimite = document.getElementById('semana-fecha-limite');
+  if (campoFechaLimite && !campoFechaLimite.value && desdeSemana) {
+    var sugerida = calcularFechaLimiteSugerida(desdeSemana);
+    if (sugerida) campoFechaLimite.value = toDateTimeLocalValue(sugerida);
+  }
+
   tabsEl.innerHTML = '';
   contEl.innerHTML = '';
 
@@ -1313,6 +1334,18 @@ function copiarLink() {
   navigator.clipboard.writeText(link).then(() => toast('✅ Link copiado'));
 }
 
+function sugerirFechaLimite() {
+  var desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
+  var campoFechaLimite = document.getElementById('semana-fecha-limite');
+  if (!campoFechaLimite) return;
+  var sugerida = calcularFechaLimiteSugerida(desdeSemana);
+  if (sugerida) {
+    campoFechaLimite.value = toDateTimeLocalValue(sugerida);
+  } else {
+    toast('⚠️ Ingresá primero la fecha de inicio de la semana');
+  }
+}
+
 // ========== FORMULARIO ==========
 var grupoSeleccionado = null;
 var pedidosPorDia = {}; // { "Lunes": { comida: "...", bebida: "..." }, ... }
@@ -1332,7 +1365,7 @@ async function cargarFormulario() {
   document.getElementById('form-sin-menu').style.display = 'none';
   if (menuEstaCerrado(menu)) {
     document.getElementById('form-cerrado').style.display = 'block';
-    document.getElementById('form-cerrado-texto').textContent = descripcionCierreMenu(menu);
+    document.getElementById('form-cerrado-texto').textContent = descripcionCierreMenu(menu) || 'Los pedidos de esta semana ya están cerrados.';
     document.getElementById('form-contenido').style.display = 'none';
     return;
   }
@@ -1340,6 +1373,22 @@ async function cargarFormulario() {
   document.getElementById('form-contenido').style.display = 'block';
   document.getElementById('form-semana-titulo').textContent =
     `Semana del ${menu.desde} al ${menu.hasta}`;
+
+  var avisoDl = document.getElementById('form-deadline-aviso');
+  if (avisoDl) {
+    if (menu.fecha_limite) {
+      var limiteFut = new Date(menu.fecha_limite);
+      if (!isNaN(limiteFut.getTime()) && Date.now() <= limiteFut.getTime()) {
+        avisoDl.textContent = '⏰ Podés hacer tu pedido hasta el ' +
+          limiteFut.toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        avisoDl.style.display = 'block';
+      } else {
+        avisoDl.style.display = 'none';
+      }
+    } else {
+      avisoDl.style.display = 'none';
+    }
+  }
 
   // Grupos
   const gg = document.getElementById('opciones-grupo');
