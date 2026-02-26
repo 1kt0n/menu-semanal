@@ -894,15 +894,22 @@ function parseFechaBaseSemana(texto) {
   return null;
 }
 
-function getEtiquetaDia(nombreDia, fechaDesdeTexto, idxOpcional) {
-  var idx = typeof idxOpcional === 'number' ? idxOpcional : DIAS.indexOf(nombreDia);
-  if (idx < 0) return nombreDia;
-
+function getEtiquetaDia(nombreDia, fechaDesdeTexto) {
   var base = parseFechaBaseSemana(fechaDesdeTexto);
   if (!base) return nombreDia;
 
+  var mapDiaADow = {
+    'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3,
+    'Jueves': 4, 'Viernes': 5, 'Sabado': 6
+  };
+  var targetDow = mapDiaADow[nombreDia];
+  if (targetDow === undefined) return nombreDia;
+
+  var baseDow = base.getDay();
+  var offset = (targetDow - baseDow + 7) % 7;
+
   var fechaDia = new Date(base.getTime());
-  fechaDia.setDate(fechaDia.getDate() + idx);
+  fechaDia.setDate(fechaDia.getDate() + offset);
   return nombreDia + ' ' + fechaDia.getDate() + '-' + (fechaDia.getMonth() + 1);
 }
 
@@ -1581,7 +1588,7 @@ async function cargarFormulario() {
   container.innerHTML = '';
 
   menu.dias.forEach(function(dia, idxDia) {
-    var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde, idxDia);
+    var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde);
     pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
     var comidasDia = (Array.isArray(dia.comidas) ? dia.comidas : []).filter(function(x) { return x && String(x).trim(); });
     var bebidasDia = (Array.isArray(dia.bebidas) ? dia.bebidas : []).filter(function(x) { return x && String(x).trim(); });
@@ -1994,7 +2001,7 @@ function renderBloqueResumen(opts) {
   menu.dias.forEach(function(dia, i) {
     const tab = document.createElement('button');
     tab.className = 'dia-tab' + (i === diaActivo ? ' activo' : '');
-    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde, i);
+    tab.textContent = getEtiquetaDia(dia.nombre, menu.desde);
     tab.onclick = function() { opts.onDiaChange(i); };
     tabsEl.appendChild(tab);
   });
