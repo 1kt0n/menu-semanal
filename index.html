@@ -1603,12 +1603,13 @@ async function cargarFormulario() {
     gg.appendChild(btn);
   });
 
-  // Días
+  // Días (ordenados cronológicamente según fecha desde)
   pedidosPorDia = {};
   const container = document.getElementById('form-dias-container');
   container.innerHTML = '';
 
-  menu.dias.forEach(function(dia, idxDia) {
+  var diasOrdenados = getDiasOrdenadosPorDesde(menu.dias, menu.desde);
+  diasOrdenados.forEach(function(dia, idxDia) {
     var etiquetaDia = getEtiquetaDia(dia.nombre, menu.desde);
     pedidosPorDia[dia.nombre] = { comida: null, bebida: null };
     var comidasDia = (Array.isArray(dia.comidas) ? dia.comidas : []).filter(function(x) { return x && String(x).trim(); });
@@ -2015,11 +2016,13 @@ function renderBloqueResumen(opts) {
     return 0;
   }
 
+  var diasOrdenados = getDiasOrdenadosPorDesde(menu.dias, menu.desde);
+
   var diaActivo = opts.diaActivo;
-  if (diaActivo < 0 || diaActivo >= menu.dias.length) diaActivo = 0;
+  if (diaActivo < 0 || diaActivo >= diasOrdenados.length) diaActivo = 0;
 
   tabsEl.innerHTML = '';
-  menu.dias.forEach(function(dia, i) {
+  diasOrdenados.forEach(function(dia, i) {
     const tab = document.createElement('button');
     tab.className = 'dia-tab' + (i === diaActivo ? ' activo' : '');
     tab.textContent = getEtiquetaDia(dia.nombre, menu.desde);
@@ -2027,7 +2030,7 @@ function renderBloqueResumen(opts) {
     tabsEl.appendChild(tab);
   });
 
-  const dia = menu.dias[diaActivo];
+  const dia = diasOrdenados[diaActivo];
   const diaName = dia.nombre;
 
   document.querySelectorAll('#' + opts.tabsId + ' .dia-tab').forEach(function(t, i) {
