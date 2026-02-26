@@ -1346,6 +1346,13 @@ var menuDias = DIAS.map(d => ({ nombre: d, comidas: [], bebidas: getBebidasFijas
 var adminDiaActivo = 0;
 
 function onDesdeInput() {
+  // Resetear tab activo al primer día del nuevo orden
+  var baseTmp = parseFechaBaseSemana((document.getElementById('semana-desde') || {}).value || '');
+  if (baseTmp) {
+    var nombreTmp = getDayNameFromDate(baseTmp);
+    var idxTmp = DIAS.indexOf(nombreTmp);
+    if (idxTmp >= 0) adminDiaActivo = idxTmp;
+  }
   renderAdminTabs();
   // Auto-sugerir Viernes al mediodía solo cuando el admin escribe (no al cargar menú)
   var desdeSemana = (document.getElementById('semana-desde') || {}).value || '';
@@ -1364,7 +1371,21 @@ function renderAdminTabs() {
   tabsEl.innerHTML = '';
   contEl.innerHTML = '';
 
-  DIAS.forEach((dia, i) => {
+  // Ordenar tabs cronológicamente según fecha "desde"
+  var ordenIndices;
+  var baseSemana = parseFechaBaseSemana(desdeSemana);
+  if (baseSemana) {
+    var nombreInicio = getDayNameFromDate(baseSemana);
+    var idxInicio = DIAS.indexOf(nombreInicio);
+    if (idxInicio >= 0) {
+      ordenIndices = [];
+      for (var k = 0; k < DIAS.length; k++) ordenIndices.push((idxInicio + k) % DIAS.length);
+    }
+  }
+  if (!ordenIndices) ordenIndices = DIAS.map(function(_, idx) { return idx; });
+
+  ordenIndices.forEach(function(i) {
+    var dia = DIAS[i];
     var etiquetaDia = getEtiquetaDia(dia, desdeSemana);
     // Tab
     const tab = document.createElement('button');
